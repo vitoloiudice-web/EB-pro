@@ -1,0 +1,7 @@
+{
+  "name": "EB-pro",
+  "description": "Hub Centralizzato Enterprise per la gestione acquisti, MRP e Business Intelligence integrato con Epicor e AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
