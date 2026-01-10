@@ -1,8 +1,10 @@
 export enum ViewState {
   DASHBOARD = 'DASHBOARD',
+  INVENTORY = 'INVENTORY',
   PURCHASING = 'PURCHASING',
-  ANALYTICS = 'ANALYTICS',
-  DOCUMENTS = 'DOCUMENTS'
+  QUALITY = 'QUALITY',
+  REPORTS = 'REPORTS',
+  SETTINGS = 'SETTINGS'
 }
 
 export interface KpiTile {
@@ -16,11 +18,32 @@ export interface KpiTile {
 
 export interface PurchaseOrder {
   id: string;
+  customId?: string;
   vendor: string;
   date: string;
   amount: number;
-  status: 'Open' | 'Closed' | 'Pending Approval';
+  status: 'Draft' | 'Approved' | 'Sent' | 'Closed' | 'Pending Approval' | 'Open';
   items: number;
+}
+
+export interface Part {
+  id: string;
+  sku: string;
+  description: string;
+  stock: number;
+  safetyStock: number;
+  leadTime: number; // Days
+  cost: number;
+  category: string;
+}
+
+export interface NonConformance {
+  id: string;
+  partId: string;
+  qtyFailed: number;
+  reason: string;
+  status: 'Open' | 'Resolved' | 'RMA Sent';
+  date: string;
 }
 
 export interface ChatMessage {
@@ -30,9 +53,9 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export interface HeatmapDataPoint {
-  region: string;
-  value: number;
-  x: number;
-  y: number;
+export interface SeasonalEvent {
+  name: string;
+  startMonth: number; // 0-11
+  endMonth: number; // 0-11
+  riskLevel: 'High' | 'Medium' | 'Low';
 }

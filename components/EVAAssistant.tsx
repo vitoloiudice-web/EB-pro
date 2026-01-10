@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../types';
 import { sendMessageToEVA } from '../services/geminiService';
+import { fetchOrders } from '../services/dataService';
 
 const EVAAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: 'Ciao! Sono EVA, il tuo EasyBuy Virtual Agent. Come posso aiutarti oggi con gli ordini o l\'MRP?', timestamp: new Date() }
+    { id: '1', role: 'model', text: 'Ciao! Sono EVA, il tuo EasyBuy Virtual Agent. Ho accesso al database ordini in tempo reale. Cosa vuoi sapere?', timestamp: new Date() }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +35,19 @@ const EVAAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const responseText = await sendMessageToEVA(userMsg.text, "Dashboard Overview");
+      // FETCH REAL DATA CONTEXT
+      // EVA needs to know the current state of the database to answer effectively
+      const realOrders = await fetchOrders();
+      const contextData = {
+          currentTime: new Date().toISOString(),
+          activeUser: "Admin User",
+          databaseContent: {
+              orders: realOrders
+          }
+      };
+
+      const responseText = await sendMessageToEVA(userMsg.text, contextData);
+      
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
@@ -44,6 +57,12 @@ const EVAAssistant: React.FC = () => {
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
       console.error(error);
+      setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'model',
+          text: "Mi dispiace, ho avuto un problema di connessione al database.",
+          timestamp: new Date()
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +121,7 @@ const EVAAssistant: React.FC = () => {
             <div className="flex items-center space-x-2 bg-slate-100 rounded-full px-4 py-2">
               <input
                 type="text"
-                placeholder="Chiedi a EVA..."
+                placeholder="Chiedi a EVA (es: Totale ordini aperti?)..."
                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm outline-none"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

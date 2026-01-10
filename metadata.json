@@ -1,7 +1,8 @@
 {
-  "name": "EB-pro",
-  "description": "Hub Centralizzato Enterprise per la gestione acquisti, MRP e Business Intelligence integrato con Epicor e AI.",
+  "name": "Easy Buy ERP",
+  "description": "SaaS Enterprise Resource Planning per procurement, qualità e MRP stagionale.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

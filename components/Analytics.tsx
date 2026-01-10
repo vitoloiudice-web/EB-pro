@@ -1,128 +1,171 @@
-import React, { useEffect, useRef } from 'react';
-import * as d3 from 'd3';
-import { HeatmapDataPoint } from '../types';
+import React, { useEffect, useState } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, LineChart, Line
+} from 'recharts';
+import { fetchOrders } from '../services/dataService';
+import { PurchaseOrder } from '../types';
 
 const Analytics: React.FC = () => {
-  const d3Container = useRef<SVGSVGElement | null>(null);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<{
+    monthlySpend: any[];
+    vendorSpend: any[];
+    statusDist: any[];
+  }>({ monthlySpend: [], vendorSpend: [], statusDist: [] });
 
   useEffect(() => {
-    if (d3Container.current) {
-      // Clear previous SVG content if any
-      d3.select(d3Container.current).selectAll("*").remove();
-
-      // Mock Data for Heatmap (Logistics Cost per Region)
-      const data: HeatmapDataPoint[] = [];
-      const rows = 10;
-      const cols = 15;
-      
-      for(let r=0; r<rows; r++) {
-        for(let c=0; c<cols; c++) {
-            data.push({
-                region: `Zone ${r}-${c}`,
-                value: Math.floor(Math.random() * 100),
-                x: c,
-                y: r
-            });
-        }
-      }
-
-      // Dimensions
-      const margin = { top: 30, right: 30, bottom: 30, left: 30 };
-      const width = 800 - margin.left - margin.right;
-      const height = 400 - margin.top - margin.bottom;
-
-      const svg = d3.select(d3Container.current)
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
-      // Scales
-      const x = d3.scaleBand()
-        .range([0, width])
-        .domain(Array.from({length: cols}, (_, i) => i.toString()))
-        .padding(0.05);
-
-      const y = d3.scaleBand()
-        .range([height, 0])
-        .domain(Array.from({length: rows}, (_, i) => i.toString()))
-        .padding(0.05);
-
-      // Color Scale (Blue intensity for cost)
-      const myColor = d3.scaleLinear<string>()
-        .range(["#f0f9ff", "#075985"])
-        .domain([1, 100]);
-
-      // Tooltip
-      const tooltip = d3.select("body")
-        .append("div")
-        .style("opacity", 0)
-        .attr("class", "tooltip")
-        .style("background-color", "white")
-        .style("border", "solid")
-        .style("border-width", "1px")
-        .style("border-color", "#ccc")
-        .style("border-radius", "5px")
-        .style("padding", "10px")
-        .style("position", "absolute")
-        .style("pointer-events", "none")
-        .style("font-size", "0.8rem");
-
-      // Draw squares
-      svg.selectAll()
-        .data(data, (d: any) => d.x + ':' + d.y)
-        .enter()
-        .append("rect")
-        .attr("x", (d) => x(d.x.toString()) || 0)
-        .attr("y", (d) => y(d.y.toString()) || 0)
-        .attr("width", x.bandwidth())
-        .attr("height", y.bandwidth())
-        .style("fill", (d) => myColor(d.value))
-        .style("rx", 4)
-        .style("ry", 4)
-        .on("mouseover", function(event, d) {
-            d3.select(this).style("stroke", "black").style("stroke-width", 2);
-            tooltip.style("opacity", 1);
-            tooltip.html(`Concentrazione Logistica<br>Valore: ${d.value}`)
-               .style("left", (event.pageX + 10) + "px")
-               .style("top", (event.pageY - 10) + "px");
-        })
-        .on("mousemove", function(event) {
-            tooltip
-               .style("left", (event.pageX + 10) + "px")
-               .style("top", (event.pageY - 10) + "px");
-        })
-        .on("mouseleave", function() {
-            d3.select(this).style("stroke", "none");
-            tooltip.style("opacity", 0);
-        });
-
-      // Add Title
-      svg.append("text")
-        .attr("x", 0)
-        .attr("y", -10)
-        .style("font-size", "14px")
-        .style("fill", "#64748b")
-        .style("font-weight", "bold")
-        .text("Mappa Geospaziale Costi Logistici (Heatmap)");
-    }
+    const loadData = async () => {
+      const data = await fetchOrders();
+      setOrders(data);
+      processData(data);
+      setLoading(false);
+    };
+    loadData();
   }, []);
+
+  const processData = (data: PurchaseOrder[]) => {
+    // 1. Monthly Spend Trend
+    const monthlyMap: Record<string, number> = {};
+    data.forEach(order => {
+      // Extract YYYY-MM
+      const month = order.date.substring(0, 7); 
+      monthlyMap[month] = (monthlyMap[month] || 0) + order.amount;
+    });
+    const monthlySpend = Object.keys(monthlyMap)
+      .sort() // Chronological order
+      .map(key => ({
+        name: key,
+        amount: monthlyMap[key]
+      }));
+
+    // 2. Top Vendors by Spend
+    const vendorMap: Record<string, number> = {};
+    data.forEach(order => {
+      vendorMap[order.vendor] = (vendorMap[order.vendor] || 0) + order.amount;
+    });
+    const vendorSpend = Object.keys(vendorMap)
+      .map(key => ({
+        name: key,
+        value: vendorMap[key]
+      }))
+      .sort((a, b) => b.value - a.value) // Descending
+      .slice(0, 5); // Top 5
+
+    // 3. Status Distribution
+    const statusMap: Record<string, number> = {};
+    data.forEach(order => {
+      statusMap[order.status] = (statusMap[order.status] || 0) + 1;
+    });
+    const statusDist = Object.keys(statusMap).map(key => ({
+      name: key,
+      value: statusMap[key]
+    }));
+
+    setAnalyticsData({ monthlySpend, vendorSpend, statusDist });
+  };
+
+  const COLORS = ['#0ea5e9', '#0284c7', '#0369a1', '#0c4a6e', '#bae6fd'];
+  const STATUS_COLORS: Record<string, string> = {
+    'Open': '#22c55e', // Green
+    'Pending Approval': '#eab308', // Yellow
+    'Closed': '#64748b' // Slate
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-epicor-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Business Intelligence</h2>
-        <p className="text-slate-500 text-sm">Analisi Dati & Trend</p>
+        <h2 className="text-2xl font-bold text-slate-800">Business Intelligence & KPI</h2>
+        <p className="text-slate-500 text-sm">Analisi basata sui dati reali delle transazioni</p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-         <div className="w-full overflow-x-auto flex justify-center">
-             <svg ref={d3Container}></svg>
-         </div>
-         <p className="mt-4 text-xs text-slate-400 text-center">
-             Visualizzazione generata tramite D3.js su dataset logistico simulato.
-         </p>
-      </div>
+      {orders.length === 0 ? (
+        <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-slate-200">
+            <p className="text-slate-500">Nessun dato disponibile per l'analisi. Crea degli ordini nella sezione Acquisti.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Chart 1: Monthly Spend Trend */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Trend Spesa Mensile</h3>
+                <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.monthlySpend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" tick={{fill: '#64748b'}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill: '#64748b'}} axisLine={false} tickLine={false} tickFormatter={(value) => `€${value/1000}k`} />
+                        <Tooltip 
+                            cursor={{fill: '#f1f5f9'}}
+                            contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                            formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Spesa']}
+                        />
+                        <Bar dataKey="amount" fill="#0ea5e9" radius={[4, 4, 0, 0]} barSize={40} />
+                    </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Chart 2: Status Distribution */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Stato Ordini (Volume)</h3>
+                <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={analyticsData.statusDist}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={5}
+                            dataKey="value"
+                        >
+                            {analyticsData.statusDist.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                        <Legend verticalAlign="bottom" height={36}/>
+                    </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Chart 3: Top Vendors */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Top 5 Fornitori per Volume di Spesa</h3>
+                <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.vendorSpend} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0"/>
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" width={150} axisLine={false} tickLine={false} tick={{fill: '#475569', fontWeight: 500}} />
+                        <Tooltip 
+                            cursor={{fill: 'transparent'}} 
+                            contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
+                            formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Totale']}
+                        />
+                        <Bar dataKey="value" fill="#0284c7" radius={[0, 4, 4, 0]} barSize={30}>
+                             {analyticsData.vendorSpend.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
