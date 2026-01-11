@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { SALES_DATA } from '../constants';
@@ -5,28 +6,39 @@ import { KpiTile } from '../types';
 import { fetchOrders, seedInitialData } from '../services/dataService';
 import { DEFAULT_SEASONAL_EVENTS } from '../utils/seasonalAlgorithms';
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+    tenantId: string;
+    isMultiTenant: boolean;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<KpiTile[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
+      // Use 'all' if multi-tenant mode is active, otherwise specific tenant
+      const effectiveFilter = isMultiTenant ? 'all' : tenantId;
+      
       await seedInitialData();
-      const orders = await fetchOrders();
+      const orders = await fetchOrders(effectiveFilter);
       
       const openOrders = orders.filter(o => o.status === 'Open' || o.status === 'Approved');
       const totalOpenValue = openOrders.reduce((sum, o) => sum + o.amount, 0);
 
+      // Unique vendors calculation based on filtered orders
+      const uniqueVendors = new Set(orders.map(o => o.vendor)).size;
+
       setKpis([
-        { id: '1', title: 'Open PO Value', value: `€ ${(totalOpenValue / 1000).toFixed(1)}k`, change: 12.5, trend: 'up', icon: 'shopping-cart' },
-        { id: '2', title: 'On-Time Delivery', value: '94%', change: -2.1, trend: 'down', icon: 'clock' },
-        { id: '3', title: 'Quality Score', value: '98/100', change: 1.5, trend: 'up', icon: 'check-circle' },
-        { id: '4', title: 'Active Suppliers', value: '24', change: 0, trend: 'neutral', icon: 'users' },
+        { id: '1', title: isMultiTenant ? 'Valore Ordini (Aggregato)' : 'Valore Ordini Aperti', value: `€ ${(totalOpenValue / 1000).toFixed(1)}k`, change: 12.5, trend: 'up', icon: 'shopping-cart' },
+        { id: '2', title: 'Consegne Puntuali', value: '94%', change: -2.1, trend: 'down', icon: 'clock' },
+        { id: '3', title: 'Punteggio Qualità', value: '98/100', change: 1.5, trend: 'up', icon: 'check-circle' },
+        { id: '4', title: 'Fornitori Attivi', value: uniqueVendors.toString(), change: 0, trend: 'neutral', icon: 'users' },
       ]);
       setLoading(false);
     };
     loadData();
-  }, []);
+  }, [tenantId, isMultiTenant]);
 
   const getMonthName = (index: number) => new Date(0, index).toLocaleString('it-IT', { month: 'short' });
 
@@ -35,10 +47,12 @@ const Dashboard: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Dashboard</h2>
-          <p className="text-slate-500 text-sm">Welcome back, Admin</p>
+          <h2 className="text-2xl font-bold text-slate-800">Dashboard {isMultiTenant && '(Multi-Tenant)'}</h2>
+          <p className="text-slate-500 text-sm">
+            {isMultiTenant ? 'Visualizzazione aggregata di tutti i plant.' : 'Bentornato, Admin'}
+          </p>
         </div>
-        <button onClick={() => window.location.reload()} className="text-epicor-600 hover:text-epicor-800 text-sm font-medium">Refresh Data</button>
+        <button onClick={() => window.location.reload()} className="text-epicor-600 hover:text-epicor-800 text-sm font-medium">Aggiorna Dati</button>
       </div>
 
       {loading ? (
@@ -48,7 +62,7 @@ const Dashboard: React.FC = () => {
           {/* KPI Tiles */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {kpis.map((kpi) => (
-              <div key={kpi.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+              <div key={kpi.id} className={`bg-white p-5 rounded-xl shadow-sm border ${isMultiTenant ? 'border-purple-100 bg-purple-50/10' : 'border-slate-100'} flex items-center justify-between`}>
                 <div>
                   <p className="text-slate-500 text-xs uppercase font-semibold tracking-wider">{kpi.title}</p>
                   <p className="text-2xl font-bold text-slate-800 mt-1">{kpi.value}</p>
@@ -81,12 +95,12 @@ const Dashboard: React.FC = () => {
 
             {/* Action Center */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Action Center</h3>
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Centro Azioni</h3>
               <ul className="space-y-3">
                 <li className="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
                   <div className="w-2 h-2 mt-2 bg-orange-500 rounded-full"></div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Approvare 3 PO</p>
+                    <p className="text-sm font-semibold text-slate-800">Approvare 3 Ordini</p>
                     <p className="text-xs text-slate-500">Ordini sopra €5k richiedono firma.</p>
                   </div>
                 </li>
@@ -102,8 +116,9 @@ const Dashboard: React.FC = () => {
 
             {/* Performance Chart */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-3">
-               <h3 className="text-lg font-bold text-slate-800 mb-4">Spend Trend (YTD)</h3>
-               <div className="h-64">
+               <h3 className="text-lg font-bold text-slate-800 mb-4">Trend di Spesa (Anno Corrente)</h3>
+               {/* Explicitly set min-height to prevent Recharts calculation error during initial render */}
+               <div className="h-64 w-full" style={{ minHeight: '250px' }}>
                  <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={SALES_DATA}>
                         <defs>

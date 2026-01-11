@@ -1,12 +1,13 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../types';
 import { sendMessageToEVA } from '../services/geminiService';
-import { fetchOrders } from '../services/dataService';
+import { fetchOrders, fetchParts } from '../services/dataService';
 
 const EVAAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: 'Ciao! Sono EVA, il tuo EasyBuy Virtual Agent. Ho accesso al database ordini in tempo reale. Cosa vuoi sapere?', timestamp: new Date() }
+    { id: '1', role: 'model', text: 'Ciao! Sono EVA, il tuo EasyBuy Virtual Agent. Ho accesso al database Ordini e Magazzino. Come posso aiutarti?', timestamp: new Date() }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,14 +36,16 @@ const EVAAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // FETCH REAL DATA CONTEXT
-      // EVA needs to know the current state of the database to answer effectively
-      const realOrders = await fetchOrders();
+      // FETCH REAL DATA CONTEXT (Orders + Inventory)
+      // Now EVA knows about Stock levels and incoming orders
+      const [realOrders, realParts] = await Promise.all([fetchOrders(), fetchParts()]);
+      
       const contextData = {
           currentTime: new Date().toISOString(),
           activeUser: "Admin User",
           databaseContent: {
-              orders: realOrders
+              orders: realOrders,
+              inventory: realParts
           }
       };
 
@@ -121,7 +124,7 @@ const EVAAssistant: React.FC = () => {
             <div className="flex items-center space-x-2 bg-slate-100 rounded-full px-4 py-2">
               <input
                 type="text"
-                placeholder="Chiedi a EVA (es: Totale ordini aperti?)..."
+                placeholder="Chiedi a EVA (es: Stock pompa basso?)..."
                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm outline-none"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

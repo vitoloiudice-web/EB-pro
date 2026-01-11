@@ -1,8 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { fetchNCRs, addNCR, fetchParts } from '../services/dataService';
 import { NonConformance, Part } from '../types';
 
-const Quality: React.FC = () => {
+interface QualityProps {
+    tenantId: string;
+    isMultiTenant: boolean;
+}
+
+const Quality: React.FC<QualityProps> = ({ tenantId, isMultiTenant }) => {
   const [ncrs, setNcrs] = useState<NonConformance[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -10,16 +16,28 @@ const Quality: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-        setNcrs(await fetchNCRs());
-        setParts(await fetchParts());
+        const effectiveFilter = isMultiTenant ? 'all' : tenantId;
+        const [loadedNcrs, loadedParts] = await Promise.all([
+            fetchNCRs(effectiveFilter),
+            fetchParts(effectiveFilter)
+        ]);
+        setNcrs(loadedNcrs);
+        setParts(loadedParts);
     };
     init();
-  }, []);
+  }, [tenantId, isMultiTenant]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addNCR({ ...newNcr, date: new Date().toISOString().split('T')[0] });
-    setNcrs(await fetchNCRs());
+    await addNCR({ 
+        tenantId: isMultiTenant ? 'main' : tenantId,
+        ...newNcr, 
+        date: new Date().toISOString().split('T')[0] 
+    });
+    
+    // Refresh
+    const effectiveFilter = isMultiTenant ? 'all' : tenantId;
+    setNcrs(await fetchNCRs(effectiveFilter));
     setIsFormOpen(false);
   };
 
@@ -27,8 +45,10 @@ const Quality: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Quality Control (QC)</h2>
-          <p className="text-slate-500 text-sm">Non-Conformances & RMA Management</p>
+          <h2 className="text-2xl font-bold text-slate-800">
+              Controllo Qualità (QC) {isMultiTenant && '(Global)'}
+          </h2>
+          <p className="text-slate-500 text-sm">Gestione Non Conformità & Resi (RMA)</p>
         </div>
         <button onClick={() => setIsFormOpen(true)} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
           ! Segnala Difetto
@@ -37,17 +57,23 @@ const Quality: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ncrs.map(ncr => {
+              // Note: Parts list might not contain the part if we are in strict mode, but in multi it should match
               const part = parts.find(p => p.id === ncr.partId) || { sku: 'Unknown', description: 'Unknown' };
               return (
-                <div key={ncr.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
-                    <div className="flex justify-between items-start">
+                <div key={ncr.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 relative">
+                    {isMultiTenant && (
+                        <div className="absolute top-2 right-2">
+                             <span className="text-[10px] uppercase bg-slate-100 text-slate-500 px-1 rounded">{ncr.tenantId}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between items-start mt-2">
                         <h4 className="font-bold text-slate-800">{part.sku}</h4>
                         <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">{ncr.status}</span>
                     </div>
                     <p className="text-sm text-slate-600 mt-1">{part.description}</p>
                     <div className="mt-4 text-sm">
-                        <p><strong>Qty Failed:</strong> {ncr.qtyFailed}</p>
-                        <p><strong>Reason:</strong> {ncr.reason}</p>
+                        <p><strong>Q.tà Difettosa:</strong> {ncr.qtyFailed}</p>
+                        <p><strong>Motivo:</strong> {ncr.reason}</p>
                         <p className="text-slate-400 text-xs mt-2">{ncr.date}</p>
                     </div>
                     <div className="mt-4 flex gap-2">
