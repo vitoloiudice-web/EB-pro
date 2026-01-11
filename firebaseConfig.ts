@@ -2,15 +2,21 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// Configuration provided in the Masterplan V2.0
+// Security Fix: Firebase config now reads from environment variables
+// Set these in .env.local (never commit .env.local to git!)
 const firebaseConfig = {
-  apiKey: "AIzaSyAiH70t--y-BJ2QnCGlMBMJah6wH-rzuPs",
-  authDomain: "eb-pro-88020.firebaseapp.com",
-  projectId: "eb-pro-88020",
-  storageBucket: "eb-pro-88020.firebasestorage.app",
-  messagingSenderId: "130601485902",
-  appId: "1:130601485902:web:409c796402268cd792651f"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
 };
+
+// Validate config in development
+if (import.meta.env.DEV && !firebaseConfig.apiKey) {
+  console.warn("[Firebase] Missing API key. Copy .env.example to .env.local and fill in your credentials.");
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

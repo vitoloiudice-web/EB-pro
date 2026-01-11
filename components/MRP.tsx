@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchSalesForecasts, fetchBOMs, fetchParts, fetchMrpProposals, saveMrpProposals, fetchOrders, fetchNCRs } from '../services/dataService';
 import { SalesForecast, BillOfMaterials, Part, MrpProposal, BOMItem, PurchaseOrder, NonConformance } from '../types';
 import { calculateMrpSuggestion, DEFAULT_SEASONAL_EVENTS } from '../utils/seasonalAlgorithms';
@@ -23,7 +23,10 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
     const [lastRun, setLastRun] = useState<Date | null>(null);
     const [proposals, setProposals] = useState<MrpProposal[]>([]);
     const [logs, setLogs] = useState<string[]>([]);
-    
+
+    // Mutex ref to prevent race conditions on double-click
+    const isRunningRef = useRef(false);
+
     // Data Stats
     const [stats, setStats] = useState({ forecastCount: 0, bomCount: 0, partCount: 0, openPoCount: 0 });
 
@@ -40,9 +43,9 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
             fetchMrpProposals(effectiveFilter),
             fetchOrders(effectiveFilter)
         ]);
-        setStats({ 
-            forecastCount: f.length, 
-            bomCount: b.length, 
+        setStats({
+            forecastCount: f.length,
+            bomCount: b.length,
             partCount: p.length,
             openPoCount: o.filter(ord => ord.status === 'Open' || ord.status === 'Approved').length
         });
@@ -50,6 +53,13 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
     };
 
     const runMRP = async () => {
+        // Race condition protection: prevent double execution
+        if (isRunningRef.current) {
+            console.warn("[MRP] Calculation already in progress, ignoring duplicate request.");
+            return;
+        }
+        isRunningRef.current = true;
+
         setLoading(true);
         setLogs([]);
         const addLog = (msg: string) => setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
@@ -57,7 +67,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
         try {
             const effectiveFilter = isMultiTenant ? 'all' : tenantId;
             addLog("Inizio Elaborazione MRP Time-Phased (Stagionale)...");
-            
+
             // 1. Fetch All Data Sources
             const forecasts = (await fetchSalesForecasts(effectiveFilter)).filter(f => f.status === 'Confirmed');
             const boms = await fetchBOMs(effectiveFilter);
@@ -84,30 +94,40 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
             };
 
             // A. Process Demand (Forecasts -> BOM Explosion)
+            // FIXED: Recursive BOM explosion that processes ALL nodes with partNumber
+            const explodeBom = (items: BOMItem[], multiplier: number, needDate: Date, bomName: string, period: string) => {
+                items.forEach(item => {
+                    // Process ALL nodes with partNumber, regardless of nodeType
+                    if (item.partNumber) {
+                        const qtyNeeded = item.quantity * multiplier;
+                        getEvents(item.partNumber).push({
+                            date: needDate,
+                            dateStr: needDate.toISOString().split('T')[0],
+                            type: 'DEMAND_BOM',
+                            qty: -qtyNeeded, // Negative for demand
+                            ref: `Plan ${period} (${bomName})`,
+                            balanceAfter: 0
+                        });
+                    }
+                    // Recurse into children if present (for nested BOM structures)
+                    if (item.children && item.children.length > 0) {
+                        explodeBom(item.children, item.quantity * multiplier, needDate, bomName, period);
+                    }
+                });
+            };
+
             forecasts.forEach(forecast => {
                 const bom = boms.find(b => b.id === forecast.bomId);
                 if (!bom) {
                     addLog(`WARN: BOM ${forecast.bomId} non trovata per previsione ${forecast.id}`);
                     return;
                 }
-                
+
                 // Assume Forecast Period is "YYYY-MM" -> Need Date is 1st of that month
                 const needDate = new Date(`${forecast.period}-01`);
 
-                // Explode BOM
-                bom.items.forEach(item => {
-                    if (item.partNumber && (item.nodeType === 'Component' || item.nodeType === 'Variant' || item.nodeType === 'Option')) {
-                        const qtyNeeded = item.quantity * forecast.quantity;
-                        getEvents(item.partNumber).push({
-                            date: needDate,
-                            dateStr: needDate.toISOString().split('T')[0],
-                            type: 'DEMAND_BOM',
-                            qty: -qtyNeeded, // Negative for demand
-                            ref: `Plan ${forecast.period} (${bom.name})`,
-                            balanceAfter: 0
-                        });
-                    }
-                });
+                // Explode BOM recursively
+                explodeBom(bom.items, forecast.quantity, needDate, bom.name, forecast.period);
             });
 
             // B. Process Supply (Open Purchase Orders)
@@ -118,7 +138,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                     const leadTimeDays = matchedPart.leadTime;
                     const arrivalDate = new Date(orderDate);
                     arrivalDate.setDate(arrivalDate.getDate() + leadTimeDays);
-                    
+
                     const finalArrival = arrivalDate < new Date() ? new Date(new Date().setDate(new Date().getDate() + 1)) : arrivalDate;
 
                     getEvents(matchedPart.sku).push({
@@ -138,23 +158,23 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
 
             parts.forEach(part => {
                 const events = getEvents(part.sku);
-                
+
                 // Initial Net Stock: Physical Stock - Blocked NCRs
                 const blockedStock = ncrs.filter(n => n.partId === part.id).reduce((sum, n) => sum + n.qtyFailed, 0);
                 const startStock = Math.max(0, part.stock - blockedStock);
-                
+
                 if (events.length === 0 && (part.averageDailyConsumption || 0) === 0 && startStock >= part.safetyStock) return;
 
                 events.sort((a, b) => a.date.getTime() - b.date.getTime());
 
                 let runningStock = startStock;
-                let currentDate = new Date(); 
-                
+                let currentDate = new Date();
+
                 const horizonEnd = new Date();
                 horizonEnd.setMonth(horizonEnd.getMonth() + 6);
 
                 const fullTimeline: TimeBucketEvent[] = [];
-                
+
                 fullTimeline.push({
                     date: new Date(),
                     dateStr: new Date().toISOString().split('T')[0],
@@ -166,10 +186,10 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
 
                 const applyConsumption = (untilDate: Date) => {
                     if (!part.averageDailyConsumption || part.averageDailyConsumption <= 0) return;
-                    
+
                     const diffTime = Math.abs(untilDate.getTime() - currentDate.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                    
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
                     if (diffDays > 0) {
                         const consumptionQty = diffDays * part.averageDailyConsumption;
                         runningStock -= consumptionQty;
@@ -178,7 +198,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
 
                 for (const event of events) {
                     if (event.date > horizonEnd) break;
-                    
+
                     if (event.date > currentDate) {
                         applyConsumption(event.date);
                         currentDate = event.date;
@@ -211,7 +231,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                         // --------------------------------------
 
                         newProposals.push({
-                            id: `MRP-${Date.now()}-${Math.floor(Math.random()*10000)}`,
+                            id: `MRP-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
                             tenantId: part.tenantId,
                             partId: part.id,
                             partSku: part.sku,
@@ -228,26 +248,26 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                             orderByDate: orderByDateStr // Optimized Date
                         });
 
-                        break; 
+                        break;
                     }
                 }
-                
+
                 // Rotation Check (Consumption Only)
                 if (part.averageDailyConsumption && runningStock >= part.safetyStock) {
                     applyConsumption(horizonEnd);
                     if (runningStock < part.safetyStock) {
-                         const missing = part.safetyStock - runningStock;
-                         const needDateObj = new Date(horizonEnd);
-                         
-                         // Seasonal Algo also for rotation based orders
-                         const seasonalCalc = calculateMrpSuggestion(
+                        const missing = part.safetyStock - runningStock;
+                        const needDateObj = new Date(horizonEnd);
+
+                        // Seasonal Algo also for rotation based orders
+                        const seasonalCalc = calculateMrpSuggestion(
                             needDateObj,
                             part.leadTime,
                             DEFAULT_SEASONAL_EVENTS
                         );
 
-                         newProposals.push({
-                            id: `MRP-ROT-${Date.now()}-${Math.floor(Math.random()*10000)}`,
+                        newProposals.push({
+                            id: `MRP-ROT-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
                             tenantId: part.tenantId,
                             partId: part.id,
                             partSku: part.sku,
@@ -269,7 +289,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
 
             // 4. Save Results
             await saveMrpProposals(newProposals, effectiveFilter);
-            setProposals(newProposals); 
+            setProposals(newProposals);
 
             if (newProposals.length > 0) {
                 addLog(`Calcolo Completato. Generate ${newProposals.length} proposte d'ordine (Time-Phased + Stagionale).`);
@@ -284,6 +304,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
             addLog("Errore critico durante esecuzione MRP.");
         } finally {
             setLoading(false);
+            isRunningRef.current = false; // Reset mutex to allow future runs
         }
     };
 
@@ -309,7 +330,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                         </svg>
                         Pannello Controllo
                     </h3>
-                    
+
                     <div className="space-y-4 mb-8">
                         <div className="flex justify-between border-b border-slate-700 pb-2">
                             <span className="text-slate-400">Piano Vendite</span>
@@ -325,7 +346,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                         </div>
                     </div>
 
-                    <button 
+                    <button
                         onClick={runMRP}
                         disabled={loading}
                         className={`w-full py-4 rounded-lg font-bold text-lg shadow-md transition-all flex justify-center items-center ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-epicor-500 hover:bg-epicor-400 hover:shadow-lg hover:scale-105'}`}
@@ -341,7 +362,7 @@ const MRP: React.FC<MRPProps> = ({ tenantId, isMultiTenant }) => {
                             </>
                         )}
                     </button>
-                    
+
                     <div className="mt-6 bg-slate-900 rounded p-3 text-xs font-mono text-green-400 h-48 overflow-y-auto">
                         {logs.length === 0 ? <span className="text-slate-600">Log di sistema in attesa...</span> : logs.map((l, i) => <div key={i}>{l}</div>)}
                     </div>
