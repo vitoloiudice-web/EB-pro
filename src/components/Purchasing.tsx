@@ -3,7 +3,8 @@ import { PurchaseOrder, Part, MrpProposal } from '../types';
 import { fetchOrders, addOrder, updateOrder, fetchParts, fetchMrpProposals, deleteMrpProposal, AVAILABLE_TENANTS } from '../services/dataService';
 import { PurchasingTable } from './Purchasing/PurchasingTable';
 import { LoadingState, ErrorState, EmptyState } from './ui/StateComponents';
-import { Pagination, usePagination } from './ui/Pagination';
+import { Pagination } from './ui/Pagination';
+import { usePagination } from '../hooks/usePagination';
 import { useToast } from './ui/Toast';
 
 interface PurchasingProps {
@@ -207,9 +208,8 @@ const Purchasing: React.FC<PurchasingProps> = ({ tenantId, isMultiTenant }) => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                activeTab === tab ? 'bg-white text-epicor-600 shadow-sm' : 'text-slate-600'
-              }`}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${activeTab === tab ? 'bg-white text-epicor-600 shadow-sm' : 'text-slate-600'
+                }`}
             >
               {idx + 1}. {tab === 'orders' ? 'Ordini' : tab === 'mrp' ? 'Proposte MRP' : 'Statistiche'}
             </button>

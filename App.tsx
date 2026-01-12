@@ -38,7 +38,11 @@ const App: React.FC = () => {
     });
 
     signInAnonymously(auth).catch((err) => {
-      console.warn("Authentication failed (Demo Mode Activated):", err.code);
+      if (err.code === 'auth/admin-restricted-operation') {
+        console.error("Firebase Auth Error: Anonymous authentication is DISABLED. Please enable it in the Firebase Console (Authentication > Sign-in method > Anonymous).");
+      } else {
+        console.warn("Authentication failed (Demo Mode Activated):", err.code);
+      }
       setAuthLoading(false);
     });
 

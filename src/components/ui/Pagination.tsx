@@ -135,38 +135,4 @@ export const Pagination: React.FC<PaginationProps> = ({
   );
 };
 
-/**
- * Hook per gestire paginazione
- */
-export function usePagination(totalItems: number, initialPageSize: number = 20) {
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(initialPageSize);
 
-  const totalPages = Math.ceil(totalItems / pageSize);
-
-  const getPaginatedData = <T,>(data: T[]): T[] => {
-    const start = (currentPage - 1) * pageSize;
-    const end = start + pageSize;
-    return data.slice(start, end);
-  };
-
-  const reset = () => {
-    setCurrentPage(1);
-  };
-
-  React.useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages]);
-
-  return {
-    currentPage,
-    pageSize,
-    totalPages,
-    setCurrentPage,
-    setPageSize,
-    getPaginatedData,
-    reset
-  };
-}

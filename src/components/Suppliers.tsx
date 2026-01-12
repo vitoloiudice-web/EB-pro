@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Supplier, SupplierType, SupplierMarket } from '../types';
 import { fetchSuppliers, addSupplier, updateSupplier, AVAILABLE_TENANTS } from '../services/dataService';
 import { LoadingState, ErrorState, EmptyState } from './ui/StateComponents';
-import { Pagination, usePagination } from './ui/Pagination';
+import { Pagination } from './ui/Pagination';
+import { usePagination } from '../hooks/usePagination';
 import { useToast } from './ui/Toast';
 
 interface SuppliersProps {
@@ -188,7 +189,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                         )}
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.type === 'Produttore' ? 'bg-blue-100 text-blue-700' :
-                                                    s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
+                                                s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
                                                 }`}>
                                                 {s.type}
                                             </span>

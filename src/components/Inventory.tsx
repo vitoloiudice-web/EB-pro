@@ -4,7 +4,8 @@ import { Part, SupplierInfo } from '../types';
 import { InventoryTable } from './Inventory/InventoryTable';
 import { InventoryModal } from './Inventory/InventoryModal';
 import { LoadingState, ErrorState, EmptyState } from './ui/StateComponents';
-import { Pagination, usePagination } from './ui/Pagination';
+import { Pagination } from './ui/Pagination';
+import { usePagination } from '../hooks/usePagination';
 import { useToast } from './ui/Toast';
 
 interface InventoryProps {
@@ -60,8 +61,8 @@ const Inventory: React.FC<InventoryProps> = ({ tenantId, isMultiTenant }) => {
     if (searchFilter === 'sku') return p.sku.toLowerCase().includes(q);
     if (searchFilter === 'desc') return p.description.toLowerCase().includes(q);
     if (searchFilter === 'internal') return p.internalCode?.toLowerCase().includes(q);
-    return p.sku.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || 
-           p.internalCode?.toLowerCase().includes(q) || p.manufacturer?.partCode.toLowerCase().includes(q);
+    return p.sku.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) ||
+      p.internalCode?.toLowerCase().includes(q) || p.manufacturer?.partCode.toLowerCase().includes(q);
   });
 
   const pagination = usePagination({ items: filteredParts, pageSize: 20 });
@@ -121,7 +122,7 @@ const Inventory: React.FC<InventoryProps> = ({ tenantId, isMultiTenant }) => {
     if (part.suppliers?.habitual) setHabitualSupplier(part.suppliers.habitual);
     if (part.suppliers?.alternatives) {
       const alts = Array(6).fill(null).map(emptySupplier);
-      part.suppliers.alternatives.forEach((a, i) => { if(i < 6) alts[i] = a; });
+      part.suppliers.alternatives.forEach((a, i) => { if (i < 6) alts[i] = a; });
       setAltSuppliers(alts);
     }
     setStockInfo({ stock: part.stock, safety: part.safetyStock });
