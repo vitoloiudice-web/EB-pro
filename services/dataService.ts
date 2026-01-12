@@ -1,7 +1,8 @@
 
-import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy, Timestamp, where } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, setDoc, doc, query, orderBy, Timestamp, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { PurchaseOrder, Part, NonConformance, Tenant, BillOfMaterials, BomSubstitutionLog, BOMItem, SalesForecast, MrpProposal, AdminProfile, Supplier } from "../types";
+import { syncService } from "./syncService";
 import { MOCK_ORDERS as ORIGINAL_MOCK_ORDERS } from "../constants";
 
 const ORDERS_COLLECTION = "purchase_orders";
@@ -9,6 +10,34 @@ const PARTS_COLLECTION = "parts";
 const NCR_COLLECTION = "non_conformances";
 const BOMS_COLLECTION = "boms";
 const SUPPLIERS_COLLECTION = "suppliers"; // NEW
+
+export const syncPendingOperations = async () => {
+  const queue = syncService.getQueue();
+  if (queue.length === 0) return;
+
+  console.log(`[Sync] Processing ${queue.length} pending operations...`);
+
+  for (const op of queue) {
+    try {
+      if (op.type === 'ADD') {
+        const payload = { ...op.payload };
+        // If we have an ID in payload, use setDoc to preserve it
+        if (payload.id) {
+          await setDoc(doc(db, op.collection, payload.id), payload);
+        } else {
+          await addDoc(collection(db, op.collection), payload);
+        }
+      } else if (op.type === 'UPDATE') {
+        if (op.docId) await updateDoc(doc(db, op.collection, op.docId), op.payload);
+      } else if (op.type === 'DELETE') {
+        if (op.docId) await deleteDoc(doc(db, op.collection, op.docId));
+      }
+      syncService.remove(op.id);
+    } catch (e) {
+      console.error(`[Sync] Failed op ${op.id}`, e);
+    }
+  }
+};
 
 // --- TENANTS CONFIGURATION WITH MOCK DETAILS ---
 const createMockSite = (city: string, active = true) => ({
@@ -486,8 +515,27 @@ export const updateSupplier = async (supplier: Supplier) => {
 };
 
 // DELETE function for Suppliers
-export const deleteSupplier = async (supplierId: string): Promise<boolean> => {
-  return deleteLocalData<Supplier>(LS_KEYS.SUPPLIERS, supplierId);
+// DELETE function for Suppliers (Local Only + Integrity Check)
+export const deleteSupplier = async (supplierId: string): Promise<{ success: boolean, message?: string }> => {
+  // Integrity Check
+  const parts = await fetchParts('all');
+  const supplier = (await fetchSuppliers('all')).find(s => s.id === supplierId);
+  if (!supplier) return { success: false, message: 'Fornitore non trovato.' };
+
+  // Check usage in Parts (Manufacturer or Supplier)
+  const usedInParts = parts.filter(p =>
+    (p.manufacturer?.name === supplier.name) ||
+    (p.suppliers?.habitual?.name === supplier.name) ||
+    (p.suppliers?.alternatives?.some(a => a.name === supplier.name))
+  );
+
+  if (usedInParts.length > 0) {
+    const partSkus = usedInParts.map(p => p.sku).slice(0, 3).join(', ');
+    return { success: false, message: `Impossibile eliminare: Fornitore usato in ${usedInParts.length} parti (${partSkus}...)` };
+  }
+
+  deleteLocalData<Supplier>(LS_KEYS.SUPPLIERS, supplierId);
+  return { success: true };
 };
 
 // --- INVENTORY ---
@@ -540,29 +588,67 @@ export const findPartByManufacturerCode = async (code: string): Promise<Part | u
 };
 
 export const addPart = async (part: Omit<Part, 'id'>) => {
+  // Generate ID explicitly to ensure consistency between offline and online
+  const newRef = doc(collection(db, PARTS_COLLECTION));
+  const newId = newRef.id;
+  const fullPart = { ...part, id: newId, tenantId: part.tenantId || 'main' };
+
   try {
-    await addDoc(collection(db, PARTS_COLLECTION), part);
+    await setDoc(newRef, fullPart);
   } catch (e) {
-    const localPart: Part = { ...part, id: `LOC-${Date.now()}` };
-    saveLocalData(LS_KEYS.PARTS, localPart);
+    console.warn("Offline addPart, queuing");
+    syncService.enqueue({ type: 'ADD', collection: PARTS_COLLECTION, payload: fullPart });
   }
+
+  // Optimistic UI update
+  const localParts = getLocalData<Part>(LS_KEYS.PARTS, MOCK_PARTS);
+  setFullLocalData(LS_KEYS.PARTS, [fullPart, ...localParts]);
 };
 
 export const updatePart = async (part: Part) => {
+  // Always update local first (Optimistic)
+  updateLocalData(LS_KEYS.PARTS, part);
+
   try {
     const partRef = doc(db, PARTS_COLLECTION, part.id);
     const { id, ...data } = part;
-    // Type-safe update: spread the data object directly
     await updateDoc(partRef, { ...data });
   } catch (e) {
-    updateLocalData(LS_KEYS.PARTS, part);
+    console.warn("Offline updatePart, queuing");
+    syncService.enqueue({ type: 'UPDATE', collection: PARTS_COLLECTION, docId: part.id, payload: { ...part } });
   }
 };
 
 // DELETE function for Parts
-export const deletePart = async (partId: string): Promise<boolean> => {
-  // Note: In production, should also check for BOM usage before deleting
-  return deleteLocalData<Part>(LS_KEYS.PARTS, partId);
+// DELETE function for Parts with Integrity Check
+export const deletePart = async (partId: string): Promise<{ success: boolean, message?: string }> => {
+  // 1. Integrity Check
+  const boms = await fetchBOMs('all');
+  const part = (await fetchParts('all')).find(p => p.id === partId);
+
+  if (!part) return { success: false, message: 'Part not found' };
+
+  // Check if used in ANY BOM item (by SKU/partNumber)
+  const usedInBoms = boms.filter(b => b.items.some(i => i.partNumber === part.sku));
+
+  if (usedInBoms.length > 0) {
+    const bomNames = usedInBoms.map(b => b.name).slice(0, 3).join(', '); // Limit to 3 names
+    const msg = `Impossibile eliminare: utilizzato in ${usedInBoms.length} BOM (${bomNames}${usedInBoms.length > 3 ? '...' : ''})`;
+    return { success: false, message: msg };
+  }
+
+  // 2. Local Delete (Optimistic)
+  deleteLocalData<Part>(LS_KEYS.PARTS, partId);
+
+  // 3. Remote Delete
+  try {
+    await deleteDoc(doc(db, PARTS_COLLECTION, partId));
+  } catch (e) {
+    console.warn("Offline delete, queuing");
+    syncService.enqueue({ type: 'DELETE', collection: PARTS_COLLECTION, docId: partId });
+  }
+
+  return { success: true };
 };
 
 export const fetchNCRs = async (tenantId: string = 'main'): Promise<NonConformance[]> => {
