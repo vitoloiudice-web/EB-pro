@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PurchaseOrder } from '../../types';
-import { Pagination, usePagination } from '../ui/Pagination';
+import { Pagination } from '../ui/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 import { useToast } from '../ui/Toast';
 import { LoadingState, ErrorState, EmptyState } from '../ui/StateComponents';
 
@@ -35,9 +36,9 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
     setDeleting(orderId);
     try {
       await onDeleteOrder(orderId);
-      showToast('Ordine eliminato', 'success');
+      showToast('success', 'Ordine eliminato');
     } catch (err) {
-      showToast('Errore durante l\'eliminazione', 'error');
+      showToast('error', 'Errore durante l\'eliminazione');
     } finally {
       setDeleting(null);
     }
@@ -52,7 +53,7 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
   }
 
   if (orders.length === 0) {
-    return <EmptyState title="Nessun ordine" message="Crea il primo ordine di acquisto" />;
+    return <EmptyState title="Nessun ordine" description="Crea il primo ordine di acquisto" />;
   }
 
   const currentOrders = pagination.getCurrentPageItems();
@@ -94,7 +95,7 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
                     onClick={() => onOrderClick(order)}
                     className="text-epicor-600 hover:underline font-medium"
                   >
-                    {order.poNumber}
+                    {order.customId || order.id}
                   </button>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-700">
@@ -108,19 +109,22 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
                 </td>
                 <td className="px-6 py-4">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      order.status === 'completed'
+                    className={`px-2 py-1 rounded-full text-xs font-semibold ${order.status === 'Closed'
                         ? 'bg-green-100 text-green-800'
-                        : order.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-slate-100 text-slate-800'
-                    }`}
+                        : order.status === 'Open' || order.status === 'Approved'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-slate-100 text-slate-800'
+                      }`}
                   >
-                    {order.status === 'completed'
-                      ? 'Completato'
-                      : order.status === 'pending'
-                      ? 'In Sospeso'
-                      : 'Bozza'}
+                    {order.status === 'Closed'
+                      ? 'Chiuso'
+                      : order.status === 'Open'
+                        ? 'Aperto'
+                        : order.status === 'Approved'
+                          ? 'Approvato'
+                          : order.status === 'Draft'
+                            ? 'Bozza'
+                            : order.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
@@ -128,7 +132,7 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
                     <button
                       onClick={() => onOrderClick(order)}
                       className="text-epicor-600 hover:text-epicor-700 text-sm font-medium"
-                      aria-label={`Modifica ordine ${order.poNumber}`}
+                      aria-label={`Modifica ordine ${order.customId || order.id}`}
                     >
                       Modifica
                     </button>
@@ -136,7 +140,7 @@ export const PurchasingTable: React.FC<PurchasingTableProps> = ({
                       onClick={() => handleDelete(order.id)}
                       disabled={deleting === order.id}
                       className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
-                      aria-label={`Elimina ordine ${order.poNumber}`}
+                      aria-label={`Elimina ordine ${order.customId || order.id}`}
                     >
                       {deleting === order.id ? 'Eliminazione...' : 'Elimina'}
                     </button>
