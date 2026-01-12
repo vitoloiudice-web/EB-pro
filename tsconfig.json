@@ -9,6 +9,14 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
     "skipLibCheck": true,
     "types": [
       "node"
@@ -18,12 +26,15 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "rootDir": "./src",
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
