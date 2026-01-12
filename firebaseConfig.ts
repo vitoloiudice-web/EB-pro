@@ -25,6 +25,19 @@ let auth;
 
 try {
   const apiKey = firebaseConfig.apiKey;
+
+  // FORCE DEBUG LOGGING
+  console.log("--- FIREBASE DEBUG ---");
+  console.log("API Key Exists:", !!apiKey);
+  if (apiKey) {
+    console.log("API Key Length:", apiKey.length);
+    console.log("First Char:", apiKey.charAt(0), "Code:", apiKey.charCodeAt(0));
+    console.log("Last Char:", apiKey.charAt(apiKey.length - 1), "Code:", apiKey.charCodeAt(apiKey.length - 1));
+    console.log("Contains Quotes:", apiKey.includes('"') || apiKey.includes("'"));
+    console.log("Contains Spaces:", apiKey.includes(" "));
+  }
+  console.log("----------------------");
+
   if (!apiKey) {
     throw new Error("VITE_FIREBASE_API_KEY is missing. Please check your .env.local or Vercel Environment Variables.");
   }
