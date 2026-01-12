@@ -19,8 +19,21 @@ if (import.meta.env.DEV && !firebaseConfig.apiKey) {
 }
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+let app;
+let db;
+let auth;
+
+try {
+  if (!firebaseConfig.apiKey) {
+    throw new Error("VITE_FIREBASE_API_KEY is missing. Please check your .env.local or Vercel Environment Variables.");
+  }
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+} catch (error) {
+  console.error("CRITICAL: Firebase Initialization Failed", error);
+  // Re-throw so the global error handler in index.html catches it and shows it to the user
+  throw error;
+}
 
 export { app, db, auth };
