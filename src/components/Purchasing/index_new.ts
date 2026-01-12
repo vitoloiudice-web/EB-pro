@@ -1,9 +1,9 @@
-// Barrel file for Inventory module
+// Barrel file for Purchasing module
 // Provides clean imports for extracted components and hooks
 
-export { useInventoryData } from './useInventoryData';
-export { InventoryTable } from './InventoryTable';
-export { InventoryModal } from './InventoryModal';
+export { default as MrpProposalList } from './MrpProposalList';
+export { usePurchasingData } from './usePurchasingData';
+export { PurchasingTable } from './PurchasingTable';
 
 // Re-export the main component from parent directory for backwards compatibility
 // This allows gradual migration without breaking existing imports

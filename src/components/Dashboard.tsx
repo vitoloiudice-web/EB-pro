@@ -5,10 +5,11 @@ import { SALES_DATA } from '../constants';
 import { KpiTile } from '../types';
 import { fetchOrders, seedInitialData } from '../services/dataService';
 import { DEFAULT_SEASONAL_EVENTS } from '../utils/seasonalAlgorithms';
+import { MetricCard } from './ui/MetricCard';
 
 interface DashboardProps {
-    tenantId: string;
-    isMultiTenant: boolean;
+  tenantId: string;
+  isMultiTenant: boolean;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
@@ -19,10 +20,10 @@ const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
     const loadData = async () => {
       // Use 'all' if multi-tenant mode is active, otherwise specific tenant
       const effectiveFilter = isMultiTenant ? 'all' : tenantId;
-      
+
       await seedInitialData();
       const orders = await fetchOrders(effectiveFilter);
-      
+
       const openOrders = orders.filter(o => o.status === 'Open' || o.status === 'Approved');
       const totalOpenValue = openOrders.reduce((sum, o) => sum + o.amount, 0);
 
@@ -43,7 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
   const getMonthName = (index: number) => new Date(0, index).toLocaleString('it-IT', { month: 'short' });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Dashboard principale">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -52,30 +53,29 @@ const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
             {isMultiTenant ? 'Visualizzazione aggregata di tutti i plant.' : 'Bentornato, Admin'}
           </p>
         </div>
-        <button onClick={() => window.location.reload()} className="text-epicor-600 hover:text-epicor-800 text-sm font-medium">Aggiorna Dati</button>
+        <button onClick={() => window.location.reload()} className="text-epicor-600 hover:text-epicor-800 text-sm font-medium" aria-label="Aggiorna i dati del dashboard">Aggiorna Dati</button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-epicor-600"></div></div>
+        <div className="flex justify-center py-12" role="status" aria-live="polite" aria-label="Caricamento in corso"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-epicor-600"></div></div>
       ) : (
         <>
           {/* KPI Tiles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" role="region" aria-label="Key Performance Indicators">
             {kpis.map((kpi) => (
-              <div key={kpi.id} className={`bg-white p-5 rounded-xl shadow-sm border ${isMultiTenant ? 'border-purple-100 bg-purple-50/10' : 'border-slate-100'} flex items-center justify-between`}>
-                <div>
-                  <p className="text-slate-500 text-xs uppercase font-semibold tracking-wider">{kpi.title}</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{kpi.value}</p>
-                </div>
-                <div className={`p-2 rounded-lg ${kpi.trend === 'up' ? 'bg-green-50 text-green-600' : kpi.trend === 'down' ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-500'}`}>
-                   <span className="text-xs font-bold">{kpi.change > 0 ? '+' : ''}{kpi.change}%</span>
-                </div>
-              </div>
+              <MetricCard
+                key={kpi.id}
+                title={kpi.title}
+                value={kpi.value}
+                change={kpi.change}
+                trend={kpi.trend}
+                icon={kpi.icon as any}
+              />
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             {/* Seasonal Radar */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
               <h3 className="text-lg font-bold text-slate-800 mb-4">Seasonal Radar (Chiusure Fornitori)</h3>
@@ -116,31 +116,32 @@ const Dashboard: React.FC<DashboardProps> = ({ tenantId, isMultiTenant }) => {
 
             {/* Performance Chart */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-3">
-               <h3 className="text-lg font-bold text-slate-800 mb-4">Trend di Spesa (Anno Corrente)</h3>
-               {/* Explicitly set min-height to prevent Recharts calculation error during initial render */}
-               <div className="h-64 w-full" style={{ minHeight: '250px' }}>
-                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={SALES_DATA}>
-                        <defs>
-                        <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0284c7" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#0284c7" stopOpacity={0}/>
-                        </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                        <YAxis axisLine={false} tickLine={false} />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="value" stroke="#0284c7" fillOpacity={1} fill="url(#colorVal)" />
-                    </AreaChart>
-                 </ResponsiveContainer>
-               </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Trend di Spesa (Anno Corrente)</h3>
+              {/* Explicitly set min-height to prevent Recharts calculation error during initial render */}
+              <div className="h-64 w-full" style={{ minHeight: '250px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={SALES_DATA}>
+                    <defs>
+                      <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0284c7" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="value" stroke="#0284c7" fillOpacity={1} fill="url(#colorVal)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
           </div>
         </>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

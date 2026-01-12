@@ -1,22 +1,34 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './firebaseConfig';
 import Sidebar from './components/Sidebar';
 import TenantHeader from './components/TenantHeader';
-import Dashboard from './components/Dashboard';
-import Purchasing from './components/Purchasing';
-import Inventory from './components/Inventory';
-import Quality from './components/Quality';
-import Reports from './components/Reports';
-import Settings from './components/Settings';
 import EVAAssistant from './components/EVAAssistant';
-import BillOfMaterialsView from './components/BillOfMaterials';
-import SalesPlan from './components/SalesPlan'; // NEW
-import MRP from './components/MRP'; // NEW
-import Suppliers from './components/Suppliers'; // NEW
 import { ViewState } from './types';
 import { AVAILABLE_TENANTS, syncPendingOperations } from './services/dataService';
+
+// LAZY LOAD HEAVY COMPONENTS (FASE 5: Performance Optimization)
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Purchasing = lazy(() => import('./components/Purchasing'));
+const Inventory = lazy(() => import('./components/Inventory'));
+const Quality = lazy(() => import('./components/Quality'));
+const Reports = lazy(() => import('./components/Reports'));
+const Settings = lazy(() => import('./components/Settings'));
+const BillOfMaterialsView = lazy(() => import('./components/BillOfMaterials'));
+const SalesPlan = lazy(() => import('./components/SalesPlan'));
+const MRP = lazy(() => import('./components/MRP'));
+const Suppliers = lazy(() => import('./components/Suppliers'));
+
+// Loading Fallback Component for Suspense boundaries
+const LoadingFallback: React.FC = () => (
+  <div className="flex items-center justify-center h-96">
+    <div className="flex flex-col items-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-epicor-600 mb-4"></div>
+      <p className="text-slate-600 font-medium">Caricamento della sezione in corso...</p>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -30,6 +42,9 @@ const App: React.FC = () => {
 
   // SESSION STATE (For Log Out / Tenant Selection)
   const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
+
+  // Loading state for lazy-loaded components
+  const [contentLoading, setContentLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -82,30 +97,36 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    switch (currentView) {
-      case ViewState.DASHBOARD:
-        return <Dashboard tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.SUPPLIERS: // NEW
-        return <Suppliers tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.BOM:
-        return <BillOfMaterialsView tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.INVENTORY:
-        return <Inventory tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.SALES_PLAN:
-        return <SalesPlan tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.MRP:
-        return <MRP tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.PURCHASING:
-        return <Purchasing tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.QUALITY:
-        return <Quality tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.REPORTS:
-        return <Reports tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-      case ViewState.SETTINGS:
-        return <Settings tenantId={currentTenantId} />; // Passed prop
-      default:
-        return <Dashboard tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
-    }
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        {(() => {
+          switch (currentView) {
+            case ViewState.DASHBOARD:
+              return <Dashboard tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.SUPPLIERS:
+              return <Suppliers tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.BOM:
+              return <BillOfMaterialsView tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.INVENTORY:
+              return <Inventory tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.SALES_PLAN:
+              return <SalesPlan tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.MRP:
+              return <MRP tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.PURCHASING:
+              return <Purchasing tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.QUALITY:
+              return <Quality tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.REPORTS:
+              return <Reports tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+            case ViewState.SETTINGS:
+              return <Settings tenantId={currentTenantId} />;
+            default:
+              return <Dashboard tenantId={currentTenantId} isMultiTenant={isMultiTenant} />;
+          }
+        })()}
+      </Suspense>
+    );
   };
 
   if (authLoading) {

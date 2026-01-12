@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Supplier, SupplierType, SupplierMarket } from '../types';
 import { fetchSuppliers, addSupplier, updateSupplier, AVAILABLE_TENANTS } from '../services/dataService';
+import { LoadingState, ErrorState, EmptyState } from './ui/StateComponents';
+import { Pagination, usePagination } from './ui/Pagination';
+import { useToast } from './ui/Toast';
 
 interface SuppliersProps {
     tenantId: string;
@@ -15,8 +18,10 @@ const MARKETS: SupplierMarket[] = [
 ];
 
 const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
+    const { showToast } = useToast();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterMarket, setFilterMarket] = useState<string>('All');
 
@@ -28,16 +33,36 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
         emailOrder: '', phone: '', type: 'Commerciale', market: 'Generico', status: 'Active'
     });
 
+    // Pagination
+    const filteredSuppliers = suppliers.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.vatNumber.includes(searchQuery) ||
+            s.market.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesMarket = filterMarket === 'All' || s.market === filterMarket;
+        return matchesSearch && matchesMarket;
+    });
+
+    const pagination = usePagination({ items: filteredSuppliers, pageSize: 12 });
+
     useEffect(() => {
         loadData();
     }, [tenantId, isMultiTenant]);
 
     const loadData = async () => {
-        setLoading(true);
-        const effectiveFilter = isMultiTenant ? 'all' : tenantId;
-        const data = await fetchSuppliers(effectiveFilter);
-        setSuppliers(data);
-        setLoading(false);
+        try {
+            setLoading(true);
+            setError(null);
+            const effectiveFilter = isMultiTenant ? 'all' : tenantId;
+            const data = await fetchSuppliers(effectiveFilter);
+            setSuppliers(data);
+            showToast(`${data.length} fornitori caricati`, 'info');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Errore durante il caricamento';
+            setError(msg);
+            showToast(msg, 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleEditClick = (supplier: Supplier) => {
@@ -58,18 +83,22 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (modalMode === 'create') {
-            await addSupplier(formData as Supplier);
-        } else {
-            await updateSupplier(formData as Supplier);
+        try {
+            if (modalMode === 'create') {
+                await addSupplier(formData as Supplier);
+                showToast('Fornitore creato con successo', 'success');
+            } else {
+                await updateSupplier(formData as Supplier);
+                showToast('Fornitore aggiornato con successo', 'success');
+            }
+            setIsModalOpen(false);
+            loadData();
+        } catch (err) {
+            showToast('Errore durante il salvataggio', 'error');
         }
-
-        setIsModalOpen(false);
-        loadData();
     };
 
-    const filteredSuppliers = suppliers.filter(s => {
+    const filteredSuppliers_unused = suppliers.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             s.vatNumber.includes(searchQuery) ||
             s.market.toLowerCase().includes(searchQuery.toLowerCase());
@@ -125,71 +154,75 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
 
             {/* TABLE */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Ragione Sociale / P.IVA</th>
-                            {isMultiTenant && <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Tenant</th>}
-                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Tipo</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Mercato</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Contatti (Ordini)</th>
-                            <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase">Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                        {loading ? (
-                            <tr><td colSpan={isMultiTenant ? 6 : 5} className="p-4 text-center text-slate-500">Caricamento...</td></tr>
-                        ) : filteredSuppliers.length === 0 ? (
-                            <tr><td colSpan={isMultiTenant ? 6 : 5} className="p-8 text-center text-slate-400 italic">Nessun fornitore trovato.</td></tr>
-                        ) : (
-                            filteredSuppliers.map(s => (
-                                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-slate-800">{s.name}</div>
-                                        <div className="text-xs text-slate-500 font-mono">{s.vatNumber}</div>
-                                    </td>
-                                    {isMultiTenant && (
+                {loading && <LoadingState message="Caricamento fornitori..." />}
+                {error && <ErrorState title="Errore" message={error} onRetry={loadData} />}
+                {!loading && !error && suppliers.length === 0 && (
+                    <EmptyState title="Nessun fornitore" message="Aggiungi il primo fornitore al sistema" />
+                )}
+                {!loading && !error && suppliers.length > 0 && (
+                    <>
+                        <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Ragione Sociale / P.IVA</th>
+                                    {isMultiTenant && <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Tenant</th>}
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Tipo</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Mercato</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Contatti (Ordini)</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-slate-200">
+                                {pagination.getCurrentPageItems().map(s => (
+                                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4">
-                                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded text-white ${AVAILABLE_TENANTS.find(t => t.id === s.tenantId)?.color || 'bg-gray-400'}`}>
-                                                {s.tenantId}
+                                            <div className="font-bold text-slate-800">{s.name}</div>
+                                            <div className="text-xs text-slate-500 font-mono">{s.vatNumber}</div>
+                                        </td>
+                                        {isMultiTenant && (
+                                            <td className="px-6 py-4">
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded text-white ${AVAILABLE_TENANTS.find(t => t.id === s.tenantId)?.color || 'bg-gray-400'}`}>
+                                                    {s.tenantId}
+                                                </span>
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.type === 'Produttore' ? 'bg-blue-100 text-blue-700' :
+                                                    s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
+                                                }`}>
+                                                {s.type}
                                             </span>
                                         </td>
-                                    )}
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.type === 'Produttore' ? 'bg-blue-100 text-blue-700' :
-                                                s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
-                                            }`}>
-                                            {s.type}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">{s.market}</td>
-                                    <td className="px-6 py-4 text-sm">
-                                        <div className="flex items-center text-slate-600 mb-1">
-                                            <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                            </svg>
-                                            {s.emailOrder}
-                                        </div>
-                                        <div className="flex items-center text-slate-500 text-xs">
-                                            <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                            </svg>
-                                            {s.phone}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => handleEditClick(s)}
-                                            className="text-epicor-600 hover:text-epicor-800 font-medium text-sm hover:underline"
-                                        >
-                                            Modifica
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                                        <td className="px-6 py-4 text-sm text-slate-600">{s.market}</td>
+                                        <td className="px-6 py-4 text-sm">
+                                            <div className="flex items-center text-slate-600 mb-1">
+                                                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                </svg>
+                                                {s.emailOrder}
+                                            </div>
+                                            <div className="flex items-center text-slate-500 text-xs">
+                                                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                                {s.phone}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={() => handleEditClick(s)}
+                                                className="text-epicor-600 hover:text-epicor-800 font-medium text-sm hover:underline"
+                                            >
+                                                Modifica
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {filteredSuppliers.length > 12 && <Pagination {...pagination} />}
+                    </>
+                )}
             </div>
 
             {/* MODAL */}
