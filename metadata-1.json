@@ -1,0 +1,8 @@
+{
+  "name": "EB-pro",
+  "description": "SaaS Enterprise Resource Planning per procurement, qualità e MRP stagionale.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}

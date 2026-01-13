@@ -1,58 +1,18 @@
 
 export enum ViewState {
-  // AREA AMMINISTRATIVA
   DASHBOARD = 'DASHBOARD',
-  HUB_FTE = 'HUB_FTE', // NEW: Electronic Invoicing Hub
-  AMMINISTRAZIONE = 'AMMINISTRAZIONE',
-  
-  // AREA LOGISTICA
-  LOGISTICA_MAGAZZINO = 'LOGISTICA_MAGAZZINO', // Ex Inventory
-  CICLO_PASSIVO = 'CICLO_PASSIVO', // Ex Purchasing
-  FORNITORI = 'FORNITORI',
-  
-  // AREA PRODUZIONE
-  DISTINTA_BASE = 'DISTINTA_BASE', // Ex BOM
-  PIANIFICAZIONE = 'PIANIFICAZIONE', // Ex Sales Plan
+  SUPPLIERS = 'SUPPLIERS', // NEW
+  BOM = 'BOM',
+  INVENTORY = 'INVENTORY',
+  SALES_PLAN = 'SALES_PLAN',
   MRP = 'MRP',
-  CONTROLLO_QUALITA = 'CONTROLLO_QUALITA', // Ex Quality
-  
-  // SISTEMA
-  SETTINGS = 'SETTINGS',
-  REPORTS = 'REPORTS'
+  PURCHASING = 'PURCHASING',
+  QUALITY = 'QUALITY',
+  REPORTS = 'REPORTS',
+  SETTINGS = 'SETTINGS'
 }
 
-// --- GOOGLE DRIVE DATABASE STATE ---
-export interface GoogleConnectionState {
-  isConnected: boolean;
-  isInitialized: boolean;
-  userEmail?: string;
-  databaseFileId?: string; // The ID of the Google Sheet acting as DB
-  error?: string;
-}
-
-// --- FATTURAZIONE ELETTRONICA (FTE) TYPES ---
-export type EsitoSDI = 'Inviata' | 'Consegnata' | 'Scartata' | 'Mancata Consegna' | 'Accettata PA' | 'Rifiutata PA';
-export type TipoDocumentoFTE = 'TD01' | 'TD04' | 'TD06'; // Fattura, Nota Credito, Parcella
-
-export interface FatturaElettronica {
-  id: string;
-  tenantId: string;
-  flusso: 'Attivo' | 'Passivo'; // Vendita vs Acquisto
-  controparte: string; // Cliente o Fornitore
-  pivaControparte: string;
-  dataDocumento: string;
-  numeroDocumento: string;
-  tipoDocumento: TipoDocumentoFTE;
-  importoTotale: number;
-  importoIva: number;
-  statoHub: 'Da Inviare' | 'In Elaborazione' | 'Conservata';
-  statoSDI: EsitoSDI;
-  dataInvioSDI?: string;
-  messaggioErrore?: string;
-  xmlContent?: string; // Mock content
-}
-
-// --- EXISTING TYPES PRESERVED & RENAMED LOGICALLY ---
+// --- COMPANY DATA STRUCTURES ---
 
 export interface AddressInfo {
   vatNumber?: string;
@@ -91,10 +51,11 @@ export interface Tenant {
   id: string;
   name: string;
   color: string;
-  currency: string; 
-  details?: TenantDetails;
+  currency: string; // Added currency
+  details?: TenantDetails; // Added detailed configuration
 }
 
+// NEW: Admin Profile for Email Sending
 export interface AdminProfile {
   companyName: string;
   vatNumber: string;
@@ -103,6 +64,8 @@ export interface AdminProfile {
   phone: string;
   email: string;
 }
+
+// --- SUPPLIERS MANAGEMENT ---
 
 export type SupplierType = 'Produttore' | 'Commerciale' | 'Vettore';
 
@@ -124,8 +87,6 @@ export type SupplierMarket =
   | 'Ferramenta'
   | 'Logistica'
   | 'Manodopera'
-  | 'Saldatura'
-  | 'Vernici'
   | 'Generico';
 
 export interface Supplier {
@@ -137,17 +98,19 @@ export interface Supplier {
   city: string;
   zipCode: string;
   country: string;
-  emailOrder: string; 
+  emailOrder: string; // Crucial for sending POs
   emailAdmin?: string;
   phone: string;
   website?: string;
   type: SupplierType;
   market: SupplierMarket;
   paymentTerms?: string;
-  rating?: number; 
+  rating?: number; // 1-5 stars
   notes?: string;
   status: 'Active' | 'Hold' | 'Blacklisted';
 }
+
+// --- EXISTING TYPES ---
 
 export interface KpiTile {
   id: string;
@@ -164,13 +127,13 @@ export interface PurchaseOrder {
   tenantId: string;
   vendor: string;
   description?: string;
-  date: string; 
-  deliveryDate?: string; 
+  date: string; // Order Creation Date
+  deliveryDate?: string; // NEW: Requested Delivery Date
   amount: number;
   status: 'Draft' | 'Approved' | 'Sent' | 'Closed' | 'Pending Approval' | 'Open';
   items: number;
-  partId?: string; 
-  logistics?: { 
+  partId?: string; // NEW: Link to Part Registry for price updates
+  logistics?: { // NEW: Logistics details
       destination?: string;
       incoterms?: string;
       carrier?: string;
@@ -186,77 +149,82 @@ export interface SupplierInfo {
   leadTime: number;
 }
 
+// NEW: Sales Plan Forecast
 export interface SalesForecast {
   id: string;
   tenantId: string;
-  period: string; 
-  bomId: string; 
+  period: string; // "2026-01"
+  bomId: string; // Link to Product BOM
   bomName: string; 
   quantity: number;
   status: 'Draft' | 'Confirmed';
 }
 
+// NEW: MRP Proposal (Output of MRP Engine)
 export interface MrpProposal {
   id: string;
   tenantId: string;
   partId: string;
   partSku: string;
   description: string;
-  requiredQty: number; 
+  requiredQty: number; // Gross Requirement
   currentStock: number;
-  missingQty: number; 
+  missingQty: number; // Net Requirement
   suggestedVendor: string;
   estimatedCost: number;
-  reason: string; 
+  reason: string; // "Fabbisogno da Piano Vendite Gennaio"
   status: 'Pending' | 'Ordered' | 'Ignored';
   createdAt: string;
-  needDate?: string; 
-  orderByDate?: string; 
+  needDate?: string; // NEW: When the stock will be depleted
+  orderByDate?: string; // NEW: When to place order (Need - LeadTime)
 }
 
+// NEW: Bill of Materials Usage (Where is this part used?)
 export interface BomUsage {
   parentId: string;
-  parentName: string; 
-  tenantId?: string; 
+  parentName: string; // e.g. "Escavatore Mod. X"
+  tenantId?: string; // NEW: Which tenant owns the parent product
   type: 'Finished Product' | 'Assembly Group' | 'Sub-Assembly';
   quantityUsed: number;
 }
 
+// NEW: Structure to track BOM Substitutions in Inventory
 export interface BomSubstitutionLog {
   id: string;
   date: string;
   bomId: string;
   bomName: string;
   bomRevision: string;
-  wbs: string;      
+  wbs: string;      // "1.1.2"
   level: number;
-  type: 'REPLACEMENT_FOR' | 'REPLACED_BY'; 
-  relatedPartSku: string; 
+  type: 'REPLACEMENT_FOR' | 'REPLACED_BY'; // Did this part replace someone, or was it replaced?
+  relatedPartSku: string; // The SKU of the other part involved
   quantity: number;
 }
 
+// NEW: Complex BOM Types
 export type BomNodeType = 'Product' | 'Assembly' | 'Sub-Assembly' | 'Component' | 'Option' | 'Variant' | 'Phantom';
 
 export interface BOMItem {
-  id: string; 
-  level: number; 
-  wbs: string; 
-  nodeType: BomNodeType; 
-  partNumber?: string; 
+  id: string; // Unique ID of the node
+  level: number; // 0, 1, 2...
+  wbs: string; // "1", "1.1", "1.a.1" - Hierarchical string
+  nodeType: BomNodeType; // NEW: Classification for MRP
+  partNumber?: string; // Optional link to Part SKU
   description: string;
   quantity: number;
   uom: string;
-  children?: BOMItem[]; 
+  children?: BOMItem[]; // Recursive structure for UI
 }
 
 export interface BillOfMaterials {
   id: string;
   tenantId: string;
-  name: string; 
+  name: string; // "Nome Breve"
   description: string;
   revision: string;
   status: 'Draft' | 'Active' | 'Obsolete';
-  items: BOMItem[]; 
+  items: BOMItem[]; // Flat list or tree root
   createdAt: string;
 }
 
@@ -264,7 +232,7 @@ export interface Part {
   id: string;
   tenantId: string;
   sku: string;
-  internalCode?: string; 
+  internalCode?: string; // NEW: Free text for tenant-specific BOM/Legacy code
   skuComponents?: {
     category: string;
     family: string;
@@ -289,8 +257,10 @@ export interface Part {
   }[];
   leadTime: number; 
   cost: number;
-  averageDailyConsumption?: number; 
+  averageDailyConsumption?: number; // NEW: For MRP projection (forecast/rotation)
+  // NEW: Where this part is used
   bomUsage?: BomUsage[];
+  // NEW: History of BOM changes involving this part
   substitutionHistory?: BomSubstitutionLog[];
 }
 

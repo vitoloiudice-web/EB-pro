@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Supplier, SupplierType, SupplierMarket } from '../types';
 import { fetchSuppliers, addSupplier, updateSupplier, AVAILABLE_TENANTS } from '../services/dataService';
 
@@ -9,9 +9,9 @@ interface SuppliersProps {
 }
 
 const MARKETS: SupplierMarket[] = [
-    'Energia / Commodity', 'Materia Prima', 'Carpenteria', 'Torneria', 'Oleodinamica',
-    'Elettrica', 'Elettronica', 'Pneumatica', 'Plastica', 'Bulloneria', 'Utensileria',
-    'DPI', 'Automotive', 'Multimarket', 'Saldatura', 'Vernici', 'Logistica', 'Manodopera', 'Generico'
+    'Energia / Commodity', 'Materia Prima', 'Carpenteria', 'Torneria', 'Oleodinamica', 
+    'Elettrica', 'Elettronica', 'Pneumatica', 'Plastica', 'Bulloneria', 'Utensileria', 
+    'DPI', 'Automotive', 'Multimarket', 'Ferramenta', 'Logistica', 'Manodopera', 'Generico'
 ];
 
 const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
@@ -19,7 +19,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterMarket, setFilterMarket] = useState<string>('All');
-
+    
     // MODAL STATE
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -58,24 +58,27 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
+        
         if (modalMode === 'create') {
             await addSupplier(formData as Supplier);
         } else {
             await updateSupplier(formData as Supplier);
         }
-
+        
         setIsModalOpen(false);
         loadData();
     };
 
-    const filteredSuppliers = suppliers.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.vatNumber.includes(searchQuery) ||
-            s.market.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesMarket = filterMarket === 'All' || s.market === filterMarket;
-        return matchesSearch && matchesMarket;
-    });
+    // Optimization: Memoize filtered list to prevent recalc on every render
+    const filteredSuppliers = useMemo(() => {
+        return suppliers.filter(s => {
+            const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                  s.vatNumber.includes(searchQuery) ||
+                                  s.market.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesMarket = filterMarket === 'All' || s.market === filterMarket;
+            return matchesSearch && matchesMarket;
+        });
+    }, [suppliers, searchQuery, filterMarket]);
 
     return (
         <div className="space-y-6">
@@ -86,7 +89,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                     </h2>
                     <p className="text-slate-500 text-sm">Gestione anagrafica, contatti e categorie merceologiche</p>
                 </div>
-                <button
+                <button 
                     onClick={handleCreateClick}
                     className="flex items-center px-4 py-2 bg-epicor-600 text-white rounded-md font-medium hover:bg-epicor-700 shadow-md transition"
                 >
@@ -100,9 +103,9 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
             {/* FILTERS */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
-                    <input
-                        type="text"
-                        placeholder="Cerca fornitore, P.IVA o mercato..."
+                    <input 
+                        type="text" 
+                        placeholder="Cerca fornitore, P.IVA o mercato..." 
                         className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-epicor-500 focus:border-epicor-500"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
@@ -112,7 +115,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                     </svg>
                 </div>
                 <div className="w-full md:w-64">
-                    <select
+                    <select 
                         className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50"
                         value={filterMarket}
                         onChange={e => setFilterMarket(e.target.value)}
@@ -156,9 +159,10 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                         </td>
                                     )}
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${s.type === 'Produttore' ? 'bg-blue-100 text-blue-700' :
-                                                s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
-                                            }`}>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                            s.type === 'Produttore' ? 'bg-blue-100 text-blue-700' : 
+                                            s.type === 'Vettore' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'
+                                        }`}>
                                             {s.type}
                                         </span>
                                     </td>
@@ -178,7 +182,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <button
+                                        <button 
                                             onClick={() => handleEditClick(s)}
                                             className="text-epicor-600 hover:text-epicor-800 font-medium text-sm hover:underline"
                                         >
@@ -200,25 +204,25 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                             <h3 className="text-xl font-bold">{modalMode === 'create' ? 'Nuovo Fornitore' : 'Modifica Anagrafica'}</h3>
                             <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
                         </div>
-
+                        
                         <div className="p-6 overflow-y-auto bg-slate-50 flex-1">
                             <form id="supplierForm" onSubmit={handleSubmit} className="space-y-6">
-
+                                
                                 {/* SECTION 1: IDENTITY */}
                                 <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                                     <h4 className="text-sm font-bold text-slate-700 uppercase mb-3 border-b pb-1">Dati Identificativi</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="md:col-span-2">
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ragione Sociale</label>
-                                            <input required type="text" className="w-full border rounded p-2" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                                            <input required type="text" className="w-full border rounded p-2" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Partita IVA</label>
-                                            <input required type="text" className="w-full border rounded p-2" value={formData.vatNumber} onChange={e => setFormData({ ...formData, vatNumber: e.target.value })} />
+                                            <input required type="text" className="w-full border rounded p-2" value={formData.vatNumber} onChange={e => setFormData({...formData, vatNumber: e.target.value})} />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sito Web</label>
-                                            <input type="text" className="w-full border rounded p-2" placeholder="www.example.com" value={formData.website || ''} onChange={e => setFormData({ ...formData, website: e.target.value })} />
+                                            <input type="text" className="w-full border rounded p-2" placeholder="www.example.com" value={formData.website || ''} onChange={e => setFormData({...formData, website: e.target.value})} />
                                         </div>
                                     </div>
                                 </div>
@@ -229,7 +233,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo Fornitore</label>
-                                            <select className="w-full border rounded p-2 bg-slate-50" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as SupplierType })}>
+                                            <select className="w-full border rounded p-2 bg-slate-50" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as SupplierType})}>
                                                 <option value="Produttore">Produttore</option>
                                                 <option value="Commerciale">Commerciale</option>
                                                 <option value="Vettore">Vettore (Logistica)</option>
@@ -237,7 +241,7 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mercato</label>
-                                            <select className="w-full border rounded p-2 bg-slate-50" value={formData.market} onChange={e => setFormData({ ...formData, market: e.target.value as SupplierMarket })}>
+                                            <select className="w-full border rounded p-2 bg-slate-50" value={formData.market} onChange={e => setFormData({...formData, market: e.target.value as SupplierMarket})}>
                                                 {MARKETS.map(m => <option key={m} value={m}>{m}</option>)}
                                             </select>
                                         </div>
@@ -250,30 +254,30 @@ const Suppliers: React.FC<SuppliersProps> = ({ tenantId, isMultiTenant }) => {
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Indirizzo</label>
-                                            <input type="text" className="w-full border rounded p-2" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                            <input type="text" className="w-full border rounded p-2" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                                         </div>
                                         <div className="grid grid-cols-3 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Città</label>
-                                                <input type="text" className="w-full border rounded p-2" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
+                                                <input type="text" className="w-full border rounded p-2" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CAP</label>
-                                                <input type="text" className="w-full border rounded p-2" value={formData.zipCode} onChange={e => setFormData({ ...formData, zipCode: e.target.value })} />
+                                                <input type="text" className="w-full border rounded p-2" value={formData.zipCode} onChange={e => setFormData({...formData, zipCode: e.target.value})} />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nazione</label>
-                                                <input type="text" className="w-full border rounded p-2" value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} />
+                                                <input type="text" className="w-full border rounded p-2" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Ordini (Cruciale)</label>
-                                                <input required type="email" className="w-full border border-blue-300 rounded p-2 bg-blue-50" placeholder="ordini@fornitore.com" value={formData.emailOrder} onChange={e => setFormData({ ...formData, emailOrder: e.target.value })} />
+                                                <input required type="email" className="w-full border border-blue-300 rounded p-2 bg-blue-50" placeholder="ordini@fornitore.com" value={formData.emailOrder} onChange={e => setFormData({...formData, emailOrder: e.target.value})} />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefono</label>
-                                                <input type="tel" className="w-full border rounded p-2" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                                                <input type="tel" className="w-full border rounded p-2" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                                             </div>
                                         </div>
                                     </div>

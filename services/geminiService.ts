@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 const API_KEY = process.env.API_KEY || '';
@@ -8,6 +9,38 @@ if (API_KEY) {
   ai = new GoogleGenAI({ apiKey: API_KEY });
 }
 
+// Optimization: Strip unnecessary fields to save tokens
+const sanitizeContext = (contextData: any) => {
+    if (!contextData || !contextData.databaseContent) return contextData;
+
+    const { orders, inventory } = contextData.databaseContent;
+
+    const cleanOrders = Array.isArray(orders) ? orders.map((o: any) => ({
+        id: o.id,
+        vendor: o.vendor,
+        amount: Math.round(o.amount), // Remove decimals
+        status: o.status,
+        desc: o.description ? o.description.substring(0, 50) : '', // Truncate
+        date: o.date
+    })) : [];
+
+    const cleanInventory = Array.isArray(inventory) ? inventory.map((p: any) => ({
+        sku: p.sku,
+        stock: p.stock,
+        safety: p.safetyStock,
+        desc: p.description ? p.description.substring(0, 50) : '',
+        cost: Math.round(p.cost)
+    })) : [];
+
+    return {
+        ...contextData,
+        databaseContent: {
+            orders: cleanOrders,
+            inventory: cleanInventory
+        }
+    };
+};
+
 export const sendMessageToEVA = async (message: string, contextData: any): Promise<string> => {
   if (!ai) {
     console.warn("Gemini API Key missing. EVA is in simulation mode.");
@@ -17,24 +50,21 @@ export const sendMessageToEVA = async (message: string, contextData: any): Promi
   try {
     const modelId = 'gemini-3-flash-preview'; 
     
-    // Inject the REAL database data into the system prompt
-    const dataContextString = JSON.stringify(contextData, null, 2);
+    // Sanitize data before sending
+    const safeContext = sanitizeContext(contextData);
+    const dataContextString = JSON.stringify(safeContext);
 
-    const systemInstruction = `You are EVA (EasyBuy Virtual Agent), an intelligent assistant for the EB-pro Enterprise system.
+    const systemInstruction = `You are EVA (EasyBuy Virtual Agent).
     
-    CRITICAL: You have access to the LIVE DATABASE of Purchase Orders provided below. 
-    Use ONLY this data to answer questions about orders, amounts, vendors, or status.
-    
-    --- LIVE DATABASE START ---
+    CONTEXT:
     ${dataContextString}
-    --- LIVE DATABASE END ---
 
-    Capabilities:
-    1. Analyze the provided JSON data to calculate totals, counts, or find specific orders.
-    2. Assist with MRP (Material Requirement Planning) queries based on this data.
-    3. Be professional, concise, and business-oriented.
-    
-    If the user asks for information not in the database, politely state you don't have that record.`;
+    ROLE:
+    Analyze the provided JSON (Orders/Inventory) to answer questions. 
+    - Be concise.
+    - If stock < safety, flag it.
+    - Calculate totals if asked.
+    `;
 
     const response = await ai.models.generateContent({
       model: modelId,

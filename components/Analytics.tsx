@@ -124,7 +124,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ tenantId, isMultiTenant }) => {
             <Tooltip 
                 cursor={{fill: 'transparent'}} 
                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
-                formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Totale']}
+                formatter={(value: number | undefined) => [`€ ${(value || 0).toLocaleString()}`, 'Totale']}
             />
             <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
         </BarChart>
@@ -170,7 +170,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ tenantId, isMultiTenant }) => {
                             <Tooltip 
                                 cursor={{fill: '#f1f5f9'}}
                                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Spesa']}
+                                formatter={(value: number | undefined) => [`€ ${(value || 0).toLocaleString()}`, 'Spesa']}
                             />
                             <Bar dataKey="amount" fill="#0ea5e9" fillOpacity={0.7} radius={[4, 4, 0, 0]} barSize={40} />
                             <Line 
@@ -228,7 +228,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ tenantId, isMultiTenant }) => {
                             <Tooltip 
                                 cursor={{fill: 'transparent'}} 
                                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
-                                formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Totale']}
+                                formatter={(value: number | undefined) => [`€ ${(value || 0).toLocaleString()}`, 'Totale']}
                             />
                             <Bar dataKey="value" fill="#0284c7" radius={[0, 4, 4, 0]} barSize={20}>
                                 {analyticsData.vendorSpend.map((entry, index) => (
@@ -252,7 +252,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ tenantId, isMultiTenant }) => {
                             <Tooltip 
                                 cursor={{fill: 'transparent'}} 
                                 contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
-                                formatter={(value: number) => [`€ ${value.toLocaleString()}`, 'Totale']}
+                                formatter={(value: number | undefined) => [`€ ${(value || 0).toLocaleString()}`, 'Totale']}
                             />
                             <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
