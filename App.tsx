@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { COMPANIES } from './constants';
 import { Company, ViewState } from './types';
@@ -32,14 +33,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Init Google Client and subscribe to login success event
     googleSheetsService.initClient().then(() => {
         console.log("Google API Initialized");
+    });
+
+    // Listener for successful login
+    googleSheetsService.setOnLoginSuccess(() => {
+      setIsAuthenticated(true);
     });
   }, []);
 
   const handleLogin = () => {
+    // We only trigger the sign in flow here.
+    // The state update happens in the callback listener set in useEffect.
     googleSheetsService.signIn();
-    setIsAuthenticated(true);
   };
 
   const cycleFontSize = () => {

@@ -19,10 +19,16 @@ class GoogleSheetsService {
   private tokenClient: any;
   private isInitialized: boolean = false;
   private accessToken: string | null = null;
+  private onLoginSuccessCallback: (() => void) | null = null;
   
   constructor() {
     this.isInitialized = false;
   }
+
+  // Allow App component to listen for successful login
+  public setOnLoginSuccess = (callback: () => void) => {
+    this.onLoginSuccessCallback = callback;
+  };
 
   public initClient = async (): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -53,8 +59,14 @@ class GoogleSheetsService {
           client_id: GOOGLE_CLIENT_ID,
           scope: SCOPES,
           callback: (tokenResponse: any) => {
-            this.accessToken = tokenResponse.access_token;
-            console.log("Access Token Received");
+            if (tokenResponse && tokenResponse.access_token) {
+              this.accessToken = tokenResponse.access_token;
+              console.log("Access Token Received");
+              // Notify the app that login succeeded
+              if (this.onLoginSuccessCallback) {
+                this.onLoginSuccessCallback();
+              }
+            }
           },
         });
 
@@ -70,9 +82,17 @@ class GoogleSheetsService {
 
   public signIn = () => {
     if (this.tokenClient) {
+      // Setup listener for potential popup blockage or errors if needed
       this.tokenClient.requestAccessToken();
     } else {
-      alert("Errore inizializzazione client Google.");
+      console.error("Google Token Client not initialized.");
+      alert(
+        "Errore Configurazione Google:\n\n" +
+        "Il dominio attuale non è autorizzato nella Google Cloud Console.\n" +
+        "1. Vai su console.cloud.google.com\n" +
+        "2. Aggiungi questo dominio alle 'Origini JavaScript autorizzate'\n" +
+        "3. Riprova tra qualche minuto."
+      );
     }
   };
 
