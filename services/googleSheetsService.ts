@@ -19,14 +19,15 @@ class GoogleSheetsService {
   private tokenClient: any;
   private isInitialized: boolean = false;
   private accessToken: string | null = null;
-  private onLoginSuccessCallback: (() => void) | null = null;
+  // Callback now accepts an email string
+  private onLoginSuccessCallback: ((email: string) => void) | null = null;
   
   constructor() {
     this.isInitialized = false;
   }
 
-  // Allow App component to listen for successful login
-  public setOnLoginSuccess = (callback: () => void) => {
+  // Allow App component to listen for successful login with user info
+  public setOnLoginSuccess = (callback: (email: string) => void) => {
     this.onLoginSuccessCallback = callback;
   };
 
@@ -51,19 +52,34 @@ class GoogleSheetsService {
     window.gapi.load('client', async () => {
       
       // 1. INIT OAUTH (Token Client) - Critical for Login
-      // We do this independently so that login button works even if API Key is restricted
       try {
           if (window.google && window.google.accounts) {
               this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                   client_id: GOOGLE_CLIENT_ID,
                   scope: SCOPES,
-                  callback: (tokenResponse: any) => {
+                  callback: async (tokenResponse: any) => {
                       if (tokenResponse && tokenResponse.access_token) {
                           this.accessToken = tokenResponse.access_token;
                           console.log("Access Token Received");
-                          // Notify the app that login succeeded
-                          if (this.onLoginSuccessCallback) {
-                              this.onLoginSuccessCallback();
+                          
+                          // Fetch User Profile Info using the token
+                          try {
+                            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                              headers: { Authorization: `Bearer ${this.accessToken}` }
+                            });
+                            const userInfo = await userInfoResponse.json();
+                            const userEmail = userInfo.email || "Utente Google";
+
+                            // Notify the app that login succeeded with email
+                            if (this.onLoginSuccessCallback) {
+                                this.onLoginSuccessCallback(userEmail);
+                            }
+                          } catch (profileErr) {
+                            console.error("Failed to fetch user profile", profileErr);
+                            // Fallback if profile fetch fails but token is valid
+                            if (this.onLoginSuccessCallback) {
+                                this.onLoginSuccessCallback("Utente Connesso");
+                            }
                           }
                       }
                   },
@@ -83,7 +99,6 @@ class GoogleSheetsService {
         console.log("GAPI Client Initialized");
       } catch (e: any) {
         console.warn("GAPI Client Init failed (API Key might be restricted). App will try to proceed.", e);
-        // We do NOT stop here. We allow the app to initialize so user can try to sign in via OAuth.
       }
 
       this.isInitialized = true;
@@ -93,7 +108,6 @@ class GoogleSheetsService {
 
   public signIn = () => {
     if (this.tokenClient) {
-      // Setup listener for potential popup blockage or errors if needed
       this.tokenClient.requestAccessToken();
     } else {
       console.error("Google Token Client not initialized.");
@@ -169,11 +183,6 @@ class GoogleSheetsService {
         rows = await this.fetchRawData(company.spreadsheetId, 'Articoli!A2:H');
         // Filter rows
         rows = rows.filter(r => r[1]?.toLowerCase().includes(search.toLowerCase()) || r[0]?.toLowerCase().includes(search.toLowerCase()));
-        // Note: In search mode, strict row index tracking is harder without a unique ID lookup map. 
-        // For simplicity in this demo, we assume the filtered result still needs a way to identify original row.
-        // We will fallback to "Mock" behavior if searching to avoid index misalignment risk in this simplified logic,
-        // OR we just map them without _rowIndex for search results (making them read-only in search view).
-        // Let's rely on pagination for editing for safety.
     } else {
         // Pagination Mode: Precise Range
         startRowIndex = (page - 1) * pageSize + 2;
@@ -321,7 +330,6 @@ class GoogleSheetsService {
   };
 
   public getOrders = async (company: Company, page: number = 1, pageSize: number = 20, search: string = ''): Promise<PaginatedResponse<PurchaseOrder>> => {
-    // Placeholder - Logic similar to Items would apply here
     const mockOrders: PurchaseOrder[] = [
         { id: 'PO-2023-1001', date: '2023-10-01', supplierId: 'SUP-01', supplierName: 'HydraForce Italia', status: 'RECEIVED', totalAmount: 4500.50, items: [], trackingCode: 'DHL-123456' },
     ];

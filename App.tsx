@@ -16,6 +16,7 @@ function App() {
   const [currentCompany, setCurrentCompany] = useState<Company>(COMPANIES[0]);
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>(''); // Store logged-in user email
   const [fontSize, setFontSize] = useState<'text-sm' | 'text-base' | 'text-lg'>('text-base');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   
@@ -38,9 +39,10 @@ function App() {
         console.log("Google API Initialized");
     });
 
-    // Listener for successful login
-    googleSheetsService.setOnLoginSuccess(() => {
+    // Listener for successful login - now receives email
+    googleSheetsService.setOnLoginSuccess((email: string) => {
       setIsAuthenticated(true);
+      setUserEmail(email);
     });
   }, []);
 
@@ -243,6 +245,7 @@ function App() {
                   <div className="text-right hidden md:block">
                      <div className="text-sm font-bold text-slate-700">Admin</div>
                      <div className="text-xs text-slate-400">Super User</div>
+                     {userEmail && <div className="text-[10px] text-blue-500 font-medium truncate max-w-[150px] mt-0.5">{userEmail}</div>}
                   </div>
                   <button className="neu-flat w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-600 font-bold border-2 border-[#EEF2F6]">
                     SA
