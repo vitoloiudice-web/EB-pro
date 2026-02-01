@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface PaginatedResult<T> {
@@ -61,6 +62,7 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
 
   return {
     data,
+    setData, // Exposed for Optimistic Updates
     total,
     loading,
     error,

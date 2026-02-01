@@ -1,3 +1,4 @@
+
 import { Company, AdminProfile } from './types';
 
 // NOTE: In a real production app, these should be environment variables.
@@ -12,17 +13,17 @@ export const COMPANIES: Company[] = [
   {
     id: 'c1',
     name: 'EcoCompact Spa',
-    spreadsheetId: '1_mock_sheet_id_eco_compact', // Placeholder
+    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // PRODUCTION DB
   },
   {
     id: 'c2',
     name: 'UrbanWaste Solutions',
-    spreadsheetId: '1_mock_sheet_id_urban_waste', // Placeholder
+    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // Shared DB for testing
   },
   {
     id: 'c3',
     name: 'HeavyDuty Trucks Ltd',
-    spreadsheetId: '1_mock_sheet_id_heavy_duty', // Placeholder
+    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // Shared DB for testing
   }
 ];
 

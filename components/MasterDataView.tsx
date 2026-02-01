@@ -33,7 +33,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
   };
 
   const { 
-    data, loading, total, page, setPage, search, setSearch, pageSize, refresh
+    data, setData, loading, total, page, setPage, search, setSearch, pageSize 
   } = usePaginatedData<Item | Supplier | Customer>({
     fetchMethod: getActiveFetcher(),
     pageSize: 15
@@ -50,18 +50,41 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (formData: any) => {
-    // In a real app, this would call an API update method via googleSheetsService
-    // For this architecture demo, we mock the success
-    console.log("Saving data:", formData);
-    
-    // Simulate UI Update by forcing a refresh or alerting
-    setIsModalOpen(false);
-    
-    // Optional: Refresh local data if we had a real backend
-    // refresh(); 
-    
-    alert(`${activeTab} salvato con successo! (Mock)`);
+  const handleSave = async (formData: any) => {
+    try {
+        const isNew = !editingEntity;
+        
+        // 1. Optimistic UI Update (Immediate feedback)
+        if (isNew) {
+            // Append to list (simplified: added to current page view)
+            setData((prev: any[]) => [...prev, formData]);
+        } else {
+            // Update item in list
+            setData((prev: any[]) => prev.map((item: any) => 
+                // Check distinct ID depending on type
+                (activeTab === 'ITEMS' && item.sku === editingEntity.sku) ||
+                (activeTab !== 'ITEMS' && item.id === editingEntity.id)
+                ? { ...formData, _rowIndex: item._rowIndex } // Preserve _rowIndex!
+                : item
+            ));
+        }
+
+        setIsModalOpen(false);
+
+        // 2. Real Backend Persistance (Fire & Forget logic, or await if critical)
+        if (activeTab === 'ITEMS') {
+            await googleSheetsService.saveItem(company, { ...formData, _rowIndex: editingEntity?._rowIndex }, isNew);
+        } else if (activeTab === 'SUPPLIERS') {
+            await googleSheetsService.saveSupplier(company, { ...formData, _rowIndex: editingEntity?._rowIndex }, isNew);
+        } else if (activeTab === 'CUSTOMERS') {
+            await googleSheetsService.saveCustomer(company, { ...formData, _rowIndex: editingEntity?._rowIndex }, isNew);
+        }
+
+    } catch (error: any) {
+        console.error("Save failed:", error);
+        alert(`Errore salvataggio: ${error.message}`);
+        // In a real app, we would rollback the optimistic update here
+    }
   };
 
   return (
@@ -208,7 +231,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
                           onClick={() => handleEdit(sup)}
                           className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
                         >
-                          View
+                          Edit
                         </button>
                       </td>
                     </tr>
@@ -229,7 +252,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
                           onClick={() => handleEdit(cust)}
                           className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
                         >
-                          View
+                          Edit
                         </button>
                       </td>
                     </tr>
