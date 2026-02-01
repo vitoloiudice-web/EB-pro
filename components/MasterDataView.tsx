@@ -33,7 +33,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
   };
 
   const { 
-    data, setData, loading, total, page, setPage, search, setSearch, pageSize 
+    data, setData, loading, total, page, setPage, search, setSearch, pageSize, refresh 
   } = usePaginatedData<Item | Supplier | Customer>({
     fetchMethod: getActiveFetcher(),
     pageSize: 15
@@ -54,24 +54,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
     try {
         const isNew = !editingEntity;
         
-        // 1. Optimistic UI Update (Immediate feedback)
-        if (isNew) {
-            // Append to list (simplified: added to current page view)
-            setData((prev: any[]) => [...prev, formData]);
-        } else {
-            // Update item in list
-            setData((prev: any[]) => prev.map((item: any) => 
-                // Check distinct ID depending on type
-                (activeTab === 'ITEMS' && item.sku === editingEntity.sku) ||
-                (activeTab !== 'ITEMS' && item.id === editingEntity.id)
-                ? { ...formData, _rowIndex: item._rowIndex } // Preserve _rowIndex!
-                : item
-            ));
-        }
-
-        setIsModalOpen(false);
-
-        // 2. Real Backend Persistance (Fire & Forget logic, or await if critical)
+        // 1. Backend Persistance
         if (activeTab === 'ITEMS') {
             await googleSheetsService.saveItem(company, { ...formData, _rowIndex: editingEntity?._rowIndex }, isNew);
         } else if (activeTab === 'SUPPLIERS') {
@@ -80,10 +63,15 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
             await googleSheetsService.saveCustomer(company, { ...formData, _rowIndex: editingEntity?._rowIndex }, isNew);
         }
 
+        setIsModalOpen(false);
+
+        // 2. Refresh data from server to get correct IDs/Indexes for all items
+        // We removed optimistic updates for creation to avoid "ghost" items without _rowIndex
+        refresh();
+
     } catch (error: any) {
         console.error("Save failed:", error);
         alert(`Errore salvataggio: ${error.message}`);
-        // In a real app, we would rollback the optimistic update here
     }
   };
 
