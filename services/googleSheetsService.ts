@@ -98,7 +98,7 @@ class GoogleSheetsService {
         });
         console.log("GAPI Client Initialized");
       } catch (e: any) {
-        console.warn("GAPI Client Init failed (API Key might be restricted). App will try to proceed.", e);
+        console.warn("GAPI Client Init failed (API Key might be restricted). App will switch to REST Fallback mode.", e);
       }
 
       this.isInitialized = true;
@@ -122,6 +122,11 @@ class GoogleSheetsService {
 
   // --- CORE SHEET UTILS ---
 
+  // Helper to check if GAPI library is fully ready
+  private isGapiReady(): boolean {
+      return window.gapi?.client?.sheets ? true : false;
+  }
+
   private getPageRange(sheetName: string, page: number, pageSize: number, lastColChar: string = 'Z'): string {
     const startRow = (page - 1) * pageSize + 2; // Assuming 1 header row
     const endRow = startRow + pageSize - 1;
@@ -133,12 +138,30 @@ class GoogleSheetsService {
       console.warn("No Access Token. Returning Mock Data.");
       return this.getMockData(range);
     }
+    
     try {
-      const response = await window.gapi.client.sheets.spreadsheets.values.get({
-        spreadsheetId: spreadsheetId,
-        range: range,
-      });
-      return response.result.values || [];
+      if (this.isGapiReady()) {
+          const response = await window.gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: spreadsheetId,
+            range: range,
+          });
+          return response.result.values || [];
+      } else {
+          // Fallback REST call if GAPI client failed to init
+          const encodedRange = encodeURIComponent(range);
+          const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`, {
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`
+            }
+          });
+          
+          if (!response.ok) {
+              throw new Error(`REST Error: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          return result.values || [];
+      }
     } catch (error) {
       console.error(`Error fetching range ${range}:`, error);
       return [];
@@ -151,23 +174,64 @@ class GoogleSheetsService {
       if (!this.accessToken) throw new Error("Devi effettuare il login per salvare i dati.");
       
       const range = `${sheetName}!A${rowIndex}`;
-      await window.gapi.client.sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [values] }
-      });
+      const body = { values: [values] };
+
+      if (this.isGapiReady()) {
+          await window.gapi.client.sheets.spreadsheets.values.update({
+              spreadsheetId,
+              range,
+              valueInputOption: 'USER_ENTERED',
+              resource: body
+          });
+      } else {
+          // Fallback REST
+          const encodedRange = encodeURIComponent(range);
+          const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error?.message || "Errore salvataggio (REST)");
+          }
+      }
   }
 
   private async appendRow(spreadsheetId: string, sheetName: string, values: any[]) {
       if (!this.accessToken) throw new Error("Devi effettuare il login per salvare i dati.");
 
-      await window.gapi.client.sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range: `${sheetName}!A:A`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [values] }
-      });
+      const range = `${sheetName}!A:A`;
+      const body = { values: [values] };
+
+      if (this.isGapiReady()) {
+          await window.gapi.client.sheets.spreadsheets.values.append({
+              spreadsheetId,
+              range,
+              valueInputOption: 'USER_ENTERED',
+              resource: body
+          });
+      } else {
+          // Fallback REST
+          const encodedRange = encodeURIComponent(range);
+          const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}:append?valueInputOption=USER_ENTERED`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+             const err = await response.json();
+             throw new Error(err.error?.message || "Errore creazione (REST)");
+          }
+      }
   }
 
   // --- ITEMS (ARTICOLI) ---
