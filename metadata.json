@@ -1,0 +1,5 @@
+{
+  "name": "EB-pro",
+  "description": "Sistema ERP Multi-Azienda per Approvvigionamento e Logistica dedicato alla produzione di compattatori rifiuti. Basato su Google Sheets e Gemini AI.",
+  "requestFramePermissions": []
+}

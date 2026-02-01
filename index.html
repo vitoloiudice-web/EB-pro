@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EB-pro | Approvvigionamento Enterprise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #EEF2F6;
+        --text-main: #334155;
+        --shadow-light: #ffffff;
+        --shadow-dark: #d1d9e6;
+      }
+      
+      body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: var(--bg-color); 
+        color: var(--text-main);
+      }
+
+      /* Neomorphism Utilities */
+      .neu-flat {
+        background: var(--bg-color);
+        box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+        border-radius: 16px;
+        border: none;
+      }
+
+      .neu-flat-sm {
+        background: var(--bg-color);
+        box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+        border-radius: 12px;
+        border: none;
+      }
+
+      .neu-pressed, .neu-input {
+        background: var(--bg-color);
+        box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+        border-radius: 12px;
+        border: none;
+        outline: none;
+      }
+
+      .neu-btn {
+        background: var(--bg-color);
+        color: #475569;
+        font-weight: 600;
+        box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .neu-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+      }
+
+      .neu-btn:active, .neu-btn.active {
+        transform: translateY(1px);
+        box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+        color: #2563eb; /* Blue text when active */
+      }
+
+      .neu-btn-primary {
+        background: var(--bg-color);
+        color: #2563eb;
+        box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+      }
+      
+      .neu-icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-color);
+        box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+        color: #64748b;
+        transition: all 0.2s ease;
+      }
+      
+      .neu-icon-btn:hover {
+        color: #2563eb;
+      }
+      
+      .neu-icon-btn:active {
+        box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+      }
+
+      /* Table overrides */
+      table { border-collapse: separate; border-spacing: 0 8px; }
+      thead tr th { background: transparent !important; color: #64748b; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; border: none; }
+      tbody tr { 
+        background: var(--bg-color);
+        box-shadow: 2px 2px 4px var(--shadow-dark), -2px -2px 4px var(--shadow-light); 
+        border-radius: 8px;
+        transition: transform 0.1s;
+      }
+      tbody tr:hover { transform: scale(1.005); }
+      td { border: none !important; }
+      td:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+      td:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: var(--bg-color); }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
