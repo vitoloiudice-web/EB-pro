@@ -6,7 +6,8 @@ import { Company, AdminProfile } from './types';
 export const GOOGLE_CLIENT_ID = "414620675878-om6fktpaf0a78h943mle3ek5dfbu4q03.apps.googleusercontent.com";
 export const GOOGLE_API_KEY = "AIzaSyDOtnn5HYInqBXGCdToLQZY2KKL2GnG-fo"; 
 export const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
-export const SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly";
+// Added userinfo.email and userinfo.profile scopes
+export const SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
 // Multi-Tenant Configuration
 export const COMPANIES: Company[] = [
