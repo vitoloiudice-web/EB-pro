@@ -1,8 +1,10 @@
+
 import React, { useState, useCallback } from 'react';
 import { Company, Item, Supplier, Customer } from '../types';
 import { googleSheetsService } from '../services/googleSheetsService';
 import Pagination from './common/Pagination';
 import { usePaginatedData } from '../hooks/usePaginatedData';
+import MasterDataModal from './MasterDataModal';
 
 interface MasterDataViewProps {
   company: Company;
@@ -12,17 +14,16 @@ type TabType = 'ITEMS' | 'SUPPLIERS' | 'CUSTOMERS';
 
 const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
   const [activeTab, setActiveTab] = useState<TabType>('ITEMS');
+  
+  // State for Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEntity, setEditingEntity] = useState<any | null>(null);
 
   // Define fetchers wrapped in useCallback to prevent infinite loops in hook
   const fetchItems = useCallback((p: number, s: number, q: string) => googleSheetsService.getItems(company, p, s, q), [company]);
   const fetchSuppliers = useCallback((p: number, s: number, q: string) => googleSheetsService.getSuppliers(company, p, s, q), [company]);
   const fetchCustomers = useCallback((p: number, s: number, q: string) => googleSheetsService.getCustomers(company, p, s, q), [company]);
 
-  // Hooks for each tab
-  // Note: In a larger app, we might conditionally render components to avoid calling all hooks at once, 
-  // but for this scale, declaring them is fine, or we can use a dynamic fetcher.
-  // Let's use a dynamic fetcher strategy for cleaner code.
-  
   const getActiveFetcher = () => {
       switch(activeTab) {
           case 'ITEMS': return fetchItems;
@@ -32,25 +33,58 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
   };
 
   const { 
-    data, loading, total, page, setPage, search, setSearch, pageSize 
+    data, loading, total, page, setPage, search, setSearch, pageSize, refresh
   } = usePaginatedData<Item | Supplier | Customer>({
     fetchMethod: getActiveFetcher(),
     pageSize: 15
   });
 
-  // Type Guards for rendering
-  const isItem = (x: any): x is Item => activeTab === 'ITEMS';
-  const isSupplier = (x: any): x is Supplier => activeTab === 'SUPPLIERS';
-  const isCustomer = (x: any): x is Customer => activeTab === 'CUSTOMERS';
+  // Handlers
+  const handleCreate = () => {
+    setEditingEntity(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (entity: any) => {
+    setEditingEntity(entity);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = (formData: any) => {
+    // In a real app, this would call an API update method via googleSheetsService
+    // For this architecture demo, we mock the success
+    console.log("Saving data:", formData);
+    
+    // Simulate UI Update by forcing a refresh or alerting
+    setIsModalOpen(false);
+    
+    // Optional: Refresh local data if we had a real backend
+    // refresh(); 
+    
+    alert(`${activeTab} salvato con successo! (Mock)`);
+  };
 
   return (
     <div className="space-y-6 flex flex-col h-full animate-fade-in">
+      
+      {/* Edit/Create Modal */}
+      <MasterDataModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        type={activeTab}
+        initialData={editingEntity}
+        onSave={handleSave}
+      />
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-700">Anagrafiche</h2>
           <p className="text-sm text-slate-500 font-medium">Database centrale</p>
         </div>
-        <button className="neu-btn px-6 py-2.5 text-blue-600">
+        <button 
+          onClick={handleCreate}
+          className="neu-btn px-6 py-2.5 text-blue-600"
+        >
            + Nuova Voce
         </button>
       </div>
@@ -147,7 +181,12 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
                       <td className="p-4 text-right font-medium text-slate-500">{item.leadTimeDays} gg</td>
                       <td className="p-4 text-slate-500 text-sm">{item.supplierId}</td>
                       <td className="p-4 text-center">
-                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase">Edit</button>
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -165,7 +204,12 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
                       <td className="p-4 text-slate-600 text-sm">{sup.email}</td>
                       <td className="p-4 text-slate-500 text-sm">{sup.paymentTerms}</td>
                       <td className="p-4 text-center">
-                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase">View</button>
+                        <button 
+                          onClick={() => handleEdit(sup)}
+                          className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
+                        >
+                          View
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -181,7 +225,12 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ company }) => {
                       <td className="p-4 text-slate-600 text-sm">{cust.region}</td>
                       <td className="p-4 text-slate-500 text-sm">{cust.paymentTerms}</td>
                       <td className="p-4 text-center">
-                        <button className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase">View</button>
+                        <button 
+                          onClick={() => handleEdit(cust)}
+                          className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
+                        >
+                          View
+                        </button>
                       </td>
                     </tr>
                   ))}
