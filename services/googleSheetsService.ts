@@ -49,34 +49,45 @@ class GoogleSheetsService {
 
   private initializeGapi = (resolve: () => void, reject: (reason?: any) => void) => {
     window.gapi.load('client', async () => {
+      
+      // 1. INIT OAUTH (Token Client) - Critical for Login
+      // We do this independently so that login button works even if API Key is restricted
+      try {
+          if (window.google && window.google.accounts) {
+              this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                  client_id: GOOGLE_CLIENT_ID,
+                  scope: SCOPES,
+                  callback: (tokenResponse: any) => {
+                      if (tokenResponse && tokenResponse.access_token) {
+                          this.accessToken = tokenResponse.access_token;
+                          console.log("Access Token Received");
+                          // Notify the app that login succeeded
+                          if (this.onLoginSuccessCallback) {
+                              this.onLoginSuccessCallback();
+                          }
+                      }
+                  },
+              });
+              console.log("OAuth Token Client Initialized");
+          }
+      } catch (err) {
+          console.error("OAuth Init failed:", err);
+      }
+
+      // 2. INIT GAPI (Data Client)
       try {
         await window.gapi.client.init({
           apiKey: GOOGLE_API_KEY,
           discoveryDocs: DISCOVERY_DOCS,
         });
-
-        this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: SCOPES,
-          callback: (tokenResponse: any) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              this.accessToken = tokenResponse.access_token;
-              console.log("Access Token Received");
-              // Notify the app that login succeeded
-              if (this.onLoginSuccessCallback) {
-                this.onLoginSuccessCallback();
-              }
-            }
-          },
-        });
-
-        this.isInitialized = true;
-        resolve();
+        console.log("GAPI Client Initialized");
       } catch (e: any) {
-        console.warn("GAPI Client Init failed. App will run in MOCK MODE.", e);
-        this.isInitialized = true; 
-        resolve();
+        console.warn("GAPI Client Init failed (API Key might be restricted). App will try to proceed.", e);
+        // We do NOT stop here. We allow the app to initialize so user can try to sign in via OAuth.
       }
+
+      this.isInitialized = true;
+      resolve();
     });
   };
 
@@ -87,11 +98,10 @@ class GoogleSheetsService {
     } else {
       console.error("Google Token Client not initialized.");
       alert(
-        "Errore Configurazione Google:\n\n" +
-        "Il dominio attuale non è autorizzato nella Google Cloud Console.\n" +
-        "1. Vai su console.cloud.google.com\n" +
-        "2. Aggiungi questo dominio alle 'Origini JavaScript autorizzate'\n" +
-        "3. Riprova tra qualche minuto."
+        "Errore Inizializzazione Google:\n\n" +
+        "Il client di login non è pronto. Ricarica la pagina.\n" +
+        "Se il problema persiste, verifica che l'ID Client OAuth in Console Google includa:\n" +
+        window.location.origin
       );
     }
   };
