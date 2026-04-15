@@ -123,6 +123,13 @@ function App() {
 
   const handleLogin = async () => {
     try {
+      // Check if we are running inside an iframe
+      if (window !== window.top) {
+        // If in iframe, we can't use signInWithPopup reliably due to COOP/COEP headers
+        // We need to prompt the user to open the app in a new tab
+        alert("Per effettuare il login con Google, apri l'applicazione in una nuova scheda cliccando sull'icona in alto a destra, oppure usa questo link: " + window.location.href);
+        return;
+      }
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed:", error);
