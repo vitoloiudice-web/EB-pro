@@ -188,6 +188,15 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
                         <div className="font-mono text-xs font-bold text-slate-700">{item.sku}</div>
                         {item.manufacturer?.mpn && <div className="font-mono text-[10px] text-slate-400">MPN: {item.manufacturer.mpn}</div>}
                         {item.customerCode && <div className="font-mono text-[10px] text-blue-500 font-bold mt-1">Cod. Cliente: {item.customerCode}</div>}
+                        {item.customerCodes && item.customerCodes.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                                {item.customerCodes.map((cc, i) => (
+                                    <div key={i} className="font-mono text-[10px] text-blue-600">
+                                        <span className="font-bold">{cc.customerName || 'Cliente'}:</span> {cc.code}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </td>
                     <td className="p-4">
                         <div className="font-bold text-slate-700 text-sm">{item.name}</div>

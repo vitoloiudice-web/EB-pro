@@ -136,7 +136,8 @@ export interface Item {
   // ---------------------------
 
   // Codice Cliente
-  customerCode?: string; // Codice interno usato dal cliente
+  customerCode?: string; // Legacy/Default Codice interno usato dal cliente
+  customerCodes?: { customerId: string; customerName: string; code: string }[]; // Multi-cliente
 
   // Produttore (Chi lo fa)
   manufacturer?: ItemManufacturerInfo;

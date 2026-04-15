@@ -91,6 +91,8 @@ const EnterpriseItemForm: React.FC<{
     const [newSup, setNewSup] = useState<Partial<ItemSupplierRelation>>({});
     const [codingSchema, setCodingSchema] = useState<CodingSchema | null>(null); // Will be set in useEffect
     const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
 
     // CRYSTALLIZED: Default Schema to ensure UI consistency even if not configured in settings
     const DEFAULT_SCHEMA: CodingSchema = {
@@ -189,7 +191,7 @@ const EnterpriseItemForm: React.FC<{
     const currentSchema = codingSchema || DEFAULT_SCHEMA;
 
     useEffect(() => {
-        const fetchProfile = async () => {
+        const fetchProfileAndCustomers = async () => {
             if (client) {
                 try {
                     const profile = await dataService.getAdminProfile(client) as AdminProfile;
@@ -202,9 +204,16 @@ const EnterpriseItemForm: React.FC<{
                     console.error("Error fetching coding schema:", err);
                     setCodingSchema(DEFAULT_SCHEMA);
                 }
+
+                try {
+                    const res = await dataService.getCustomers(client);
+                    setCustomers(res.data);
+                } catch (err) {
+                    console.error("Error fetching customers:", err);
+                }
             }
         };
-        fetchProfile();
+        fetchProfileAndCustomers();
     }, [client]);
 
     const generateSku = (currentItem: Item, schema: CodingSchema) => {
@@ -667,16 +676,104 @@ const EnterpriseItemForm: React.FC<{
                 {activeTab === 'CUSTOMER_CODE' && (
                     <div className="space-y-4">
                         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                            <h4 className="text-sm font-bold text-blue-800 mb-2">Codice Articolo Cliente</h4>
+                            <h4 className="text-sm font-bold text-blue-800 mb-2">Codici Articolo Cliente (Multi-Cliente)</h4>
                             <p className="text-xs text-blue-600 mb-4">
-                                Inserisci il codice interno utilizzato dal cliente per identificare questo articolo nelle sue distinte base o nei suoi magazzini.
+                                Seleziona i clienti e inserisci il codice interno utilizzato da ciascuno per identificare questo articolo nelle loro distinte base o magazzini.
                             </p>
-                            <InputGroup 
-                                label="Codice Cliente" 
-                                value={item.customerCode || ''} 
-                                onChange={(val) => onChange({...item, customerCode: val})} 
-                                placeholder="Es. CL-12345" 
-                            />
+                            
+                            {/* Legacy Field for backward compatibility */}
+                            <div className="mb-6 pb-4 border-b border-blue-200">
+                                <InputGroup 
+                                    label="Codice Cliente Principale (Legacy)" 
+                                    value={item.customerCode || ''} 
+                                    onChange={(val) => onChange({...item, customerCode: val})} 
+                                    placeholder="Es. CL-12345" 
+                                />
+                            </div>
+
+                            {/* Dropdown Multi-Select */}
+                            <div className="relative mb-4">
+                                <button 
+                                    onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
+                                    className="w-full text-left neu-input px-3 py-2 text-sm font-medium text-slate-700 bg-white flex justify-between items-center"
+                                >
+                                    <span>Seleziona Clienti ({item.customerCodes?.length || 0})</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                
+                                {isCustomerDropdownOpen && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        {customers.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-500">Nessun cliente trovato in anagrafica.</div>
+                                        ) : (
+                                            customers.map(cust => {
+                                                const isSelected = (item.customerCodes || []).some(c => c.customerId === cust.id);
+                                                return (
+                                                    <label key={cust.id} className="flex items-center px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="mr-2 accent-blue-600"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                let newCodes = [...(item.customerCodes || [])];
+                                                                if (e.target.checked) {
+                                                                    newCodes.push({ customerId: cust.id, customerName: cust.name, code: '' });
+                                                                } else {
+                                                                    newCodes = newCodes.filter(c => c.customerId !== cust.id);
+                                                                }
+                                                                onChange({...item, customerCodes: newCodes});
+                                                            }}
+                                                        />
+                                                        <span className="text-sm text-slate-700">{cust.name}</span>
+                                                    </label>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Multi-Customer Codes List */}
+                            <div className="space-y-2 mb-4">
+                                <h5 className="text-xs font-bold text-slate-600 uppercase">Mappatura Clienti Selezionati</h5>
+                                {(item.customerCodes || []).map((cc, idx) => (
+                                    <div key={cc.customerId || idx} className="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded-lg border border-blue-100">
+                                        <div className="col-span-5">
+                                            <div className="text-xs font-bold text-slate-700 px-1 truncate" title={cc.customerName}>
+                                                {cc.customerName}
+                                            </div>
+                                        </div>
+                                        <div className="col-span-6">
+                                            <input 
+                                                type="text" 
+                                                value={cc.code} 
+                                                onChange={(e) => {
+                                                    const newCodes = [...(item.customerCodes || [])];
+                                                    newCodes[idx].code = e.target.value;
+                                                    onChange({...item, customerCodes: newCodes});
+                                                }}
+                                                placeholder="Codice Articolo"
+                                                className="w-full text-xs p-1.5 bg-slate-50 border border-slate-200 rounded font-mono"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 flex justify-center">
+                                            <button 
+                                                onClick={() => {
+                                                    const newCodes = [...(item.customerCodes || [])];
+                                                    newCodes.splice(idx, 1);
+                                                    onChange({...item, customerCodes: newCodes});
+                                                }}
+                                                className="text-red-400 hover:text-red-600"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(item.customerCodes || []).length === 0 && (
+                                    <p className="text-xs text-slate-400 italic">Nessun cliente selezionato.</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
