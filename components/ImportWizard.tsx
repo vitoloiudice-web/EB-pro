@@ -33,6 +33,7 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose, onImportCo
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [processedOrders, setProcessedOrders] = useState<PurchaseOrder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,7 +70,8 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose, onImportCo
         }
       } catch (err) {
         console.error("Error parsing Excel", err);
-        alert("Errore nella lettura del file. Verifica il formato.");
+        setError("Errore nella lettura del file. Verifica il formato.");
+        setTimeout(() => setError(null), 5000);
       } finally {
         setIsProcessing(false);
       }
@@ -103,7 +105,8 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose, onImportCo
     // Validate mapping
     const missing = REQUIRED_FIELDS.filter(f => !mapping[f.key]);
     if (missing.length > 0) {
-      alert(`Collega tutti i campi obbligatori. Mancano: ${missing.map(m => m.label).join(', ')}`);
+      setError(`Collega tutti i campi obbligatori. Mancano: ${missing.map(m => m.label).join(', ')}`);
+      setTimeout(() => setError(null), 5000);
       return;
     }
 
@@ -172,7 +175,13 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose, onImportCo
   // --- RENDER ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="bg-[#EEF2F6] w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      {error && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-red-50 border border-red-200 rounded-xl shadow-xl text-red-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
+        </div>
+      )}
+      <div className="bg-[#EEF2F6] w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
@@ -186,112 +195,112 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose, onImportCo
         </div>
 
         {/* Content */}
-        <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-          
-          {/* Progress Steps */}
-          <div className="flex items-center justify-center mb-8">
-            <div className={`flex items-center ${step === 'UPLOAD' ? 'text-blue-600' : 'text-slate-400'}`}>
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'UPLOAD' ? 'neu-pressed' : 'neu-flat'}`}>1</span>
-                <span className="ml-2 text-sm font-bold">Upload</span>
+        <div className="p-4 sm:p-8 overflow-auto flex-1 custom-scrollbar">
+          <div className="min-w-[300px]">
+            {/* Progress Steps */}
+            <div className="flex items-center justify-center mb-8">
+              <div className={`flex items-center ${step === 'UPLOAD' ? 'text-blue-600' : 'text-slate-400'}`}>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'UPLOAD' ? 'neu-pressed' : 'neu-flat'}`}>1</span>
+                  <span className="ml-2 text-sm font-bold hidden sm:inline">Upload</span>
+              </div>
+              <div className="w-8 sm:w-16 h-1 bg-slate-200 mx-2 sm:mx-4"></div>
+              <div className={`flex items-center ${step === 'MAPPING' ? 'text-blue-600' : 'text-slate-400'}`}>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'MAPPING' ? 'neu-pressed' : 'neu-flat'}`}>2</span>
+                  <span className="ml-2 text-sm font-bold hidden sm:inline">Mapping</span>
+              </div>
+              <div className="w-8 sm:w-16 h-1 bg-slate-200 mx-2 sm:mx-4"></div>
+              <div className={`flex items-center ${step === 'PREVIEW' ? 'text-blue-600' : 'text-slate-400'}`}>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'PREVIEW' ? 'neu-pressed' : 'neu-flat'}`}>3</span>
+                  <span className="ml-2 text-sm font-bold hidden sm:inline">Preview</span>
+              </div>
             </div>
-            <div className="w-16 h-1 bg-slate-200 mx-4"></div>
-            <div className={`flex items-center ${step === 'MAPPING' ? 'text-blue-600' : 'text-slate-400'}`}>
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'MAPPING' ? 'neu-pressed' : 'neu-flat'}`}>2</span>
-                <span className="ml-2 text-sm font-bold">Mapping</span>
-            </div>
-            <div className="w-16 h-1 bg-slate-200 mx-4"></div>
-            <div className={`flex items-center ${step === 'PREVIEW' ? 'text-blue-600' : 'text-slate-400'}`}>
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 'PREVIEW' ? 'neu-pressed' : 'neu-flat'}`}>3</span>
-                <span className="ml-2 text-sm font-bold">Preview</span>
-            </div>
-          </div>
 
-          {step === 'UPLOAD' && (
-            <div className="flex flex-col items-center justify-center py-10">
-               <div 
-                 className="w-full h-64 neu-pressed rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors"
-                 onClick={() => fileInputRef.current?.click()}
-               >
-                 <svg className="w-16 h-16 text-slate-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                 <p className="text-slate-600 font-bold mb-1">Clicca per caricare il file</p>
-                 <p className="text-xs text-slate-400">Supporta .xlsx, .xls, .csv</p>
-                 <input 
-                   type="file" 
-                   ref={fileInputRef} 
-                   className="hidden" 
-                   accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                   onChange={handleFileChange}
-                 />
-               </div>
-               {isProcessing && <p className="mt-4 text-blue-600 font-bold animate-pulse">Analisi del file in corso...</p>}
-            </div>
-          )}
-
-          {step === 'MAPPING' && (
-            <div className="space-y-6">
-              <div className="neu-flat p-4 mb-4 flex items-center bg-blue-50/50">
-                 <svg className="w-6 h-6 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 <div className="text-sm">
-                   <p className="font-bold text-slate-700">Configurazione Colonne</p>
-                   <p className="text-slate-500">Collega i campi del file Excel ai campi del sistema ERP.</p>
+            {step === 'UPLOAD' && (
+              <div className="flex flex-col items-center justify-center py-10">
+                 <div 
+                   className="w-full h-64 neu-pressed rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors"
+                   onClick={() => fileInputRef.current?.click()}
+                 >
+                   <svg className="w-16 h-16 text-slate-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                   <p className="text-slate-600 font-bold mb-1 text-center px-4">Clicca per caricare il file</p>
+                   <p className="text-xs text-slate-400">Supporta .xlsx, .xls, .csv</p>
+                   <input 
+                     type="file" 
+                     ref={fileInputRef} 
+                     className="hidden" 
+                     accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                     onChange={handleFileChange}
+                   />
                  </div>
+                 {isProcessing && <p className="mt-4 text-blue-600 font-bold animate-pulse">Analisi del file in corso...</p>}
               </div>
+            )}
 
-              <div className="grid grid-cols-1 gap-4">
-                 {REQUIRED_FIELDS.map((field) => (
-                   <div key={field.key} className="flex items-center justify-between p-3 neu-flat rounded-xl">
-                      <div className="flex flex-col w-1/2">
-                        <span className="text-sm font-bold text-slate-700">{field.label}</span>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">{field.type === 'HEADER' ? 'Dati Testata' : 'Dati Riga'}</span>
-                      </div>
-                      <div className="w-1/2">
-                         <select 
-                           value={mapping[field.key] || ''}
-                           onChange={(e) => handleMapChange(field.key, e.target.value)}
-                           className="w-full neu-pressed px-3 py-2 text-sm text-slate-600 font-medium"
-                         >
-                            <option value="">-- Seleziona Colonna --</option>
-                            {rawHeaders.map(h => (
-                              <option key={h} value={h}>{h}</option>
-                            ))}
-                         </select>
-                      </div>
+            {step === 'MAPPING' && (
+              <div className="space-y-6">
+                <div className="neu-flat p-4 mb-4 flex items-center bg-blue-50/50">
+                   <svg className="w-6 h-6 text-blue-500 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   <div className="text-sm">
+                     <p className="font-bold text-slate-700">Configurazione Colonne</p>
+                     <p className="text-slate-500">Collega i campi del file Excel ai campi del sistema ERP.</p>
                    </div>
-                 ))}
-              </div>
-            </div>
-          )}
+                </div>
 
-          {step === 'PREVIEW' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                 <h4 className="text-lg font-bold text-slate-700">Riepilogo Importazione</h4>
-                 <span className="neu-pressed px-3 py-1 text-sm font-bold text-blue-600">{processedOrders.length} Ordini Identificati</span>
-              </div>
-
-              <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                {processedOrders.slice(0, 10).map((po, idx) => (
-                  <div key={idx} className="neu-flat p-4 rounded-xl border-l-4 border-blue-500">
-                     <div className="flex justify-between mb-2">
-                        <span className="font-bold text-slate-700">{po.id}</span>
-                        <span className="text-xs font-bold text-slate-400">{po.date}</span>
-                     </div>
-                     <div className="flex justify-between items-end">
-                        <div className="text-sm text-slate-600">{po.supplierName}</div>
-                        <div className="text-right">
-                           <div className="text-xs text-slate-400">{po.items.length} Articoli</div>
-                           <div className="font-bold text-slate-800">€ {po.totalAmount.toLocaleString('it-IT', {minimumFractionDigits: 2})}</div>
+                <div className="grid grid-cols-1 gap-4">
+                   {REQUIRED_FIELDS.map((field) => (
+                     <div key={field.key} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 neu-flat rounded-xl gap-3">
+                        <div className="flex flex-col w-full sm:w-1/2">
+                          <span className="text-sm font-bold text-slate-700">{field.label}</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400">{field.type === 'HEADER' ? 'Dati Testata' : 'Dati Riga'}</span>
+                        </div>
+                        <div className="w-full sm:w-1/2">
+                           <select 
+                             value={mapping[field.key] || ''}
+                             onChange={(e) => handleMapChange(field.key, e.target.value)}
+                             className="w-full neu-pressed px-3 py-2 text-sm text-slate-600 font-medium"
+                           >
+                              <option value="">-- Seleziona Colonna --</option>
+                              {rawHeaders.map(h => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                           </select>
                         </div>
                      </div>
-                  </div>
-                ))}
-                {processedOrders.length > 10 && (
-                  <p className="text-center text-sm text-slate-500 italic mt-2">...e altri {processedOrders.length - 10} ordini</p>
-                )}
+                   ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
+            {step === 'PREVIEW' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                   <h4 className="text-lg font-bold text-slate-700">Riepilogo Importazione</h4>
+                   <span className="neu-pressed px-3 py-1 text-sm font-bold text-blue-600">{processedOrders.length} Ordini Identificati</span>
+                </div>
+
+                <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                  {processedOrders.slice(0, 10).map((po, idx) => (
+                    <div key={idx} className="neu-flat p-4 rounded-xl border-l-4 border-blue-500">
+                       <div className="flex justify-between mb-2">
+                          <span className="font-bold text-slate-700">{po.id}</span>
+                          <span className="text-xs font-bold text-slate-400">{po.date}</span>
+                       </div>
+                       <div className="flex justify-between items-end">
+                          <div className="text-sm text-slate-600">{po.supplierName}</div>
+                          <div className="text-right">
+                             <div className="text-xs text-slate-400">{po.items.length} Articoli</div>
+                             <div className="font-bold text-slate-800">€ {po.totalAmount.toLocaleString('it-IT', {minimumFractionDigits: 2})}</div>
+                          </div>
+                       </div>
+                    </div>
+                  ))}
+                  {processedOrders.length > 10 && (
+                    <p className="text-center text-sm text-slate-500 italic mt-2">...e altri {processedOrders.length - 10} ordini</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer Actions */}

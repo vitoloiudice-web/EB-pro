@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { Company, Supplier, QualificationCriterion } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Client, Supplier, QualificationCriterion } from '../types';
+import { dataService } from '../services/dataService';
 import { 
-  ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
   BarChart, Bar, Legend
 } from 'recharts';
+import Tooltip from './common/Tooltip';
 import CriteriaManagerModal from './CriteriaManagerModal';
+import MasterDataModal from './MasterDataModal';
 
 interface SupplierQualificationViewProps {
-  company: Company;
+  client: Client;
 }
 
 // --- INITIAL MOCK DATA ---
@@ -38,12 +41,65 @@ const MOCK_SUPPLIERS_FULL: Supplier[] = [
   },
 ];
 
-const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ company }) => {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS_FULL);
+const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ client }) => {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [criteria, setCriteria] = useState<QualificationCriterion[]>(DEFAULT_CRITERIA);
+  const [criteria, setCriteria] = useState<QualificationCriterion[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Fetch real data from database
+  const fetchData = async () => {
+    if (!client) return;
+    setLoading(true);
+    try {
+      const [suppliersRes, criteriaRes] = await Promise.all([
+        dataService.getSuppliers(client, 1, 100, ''),
+        dataService.getQualificationCriteria(client)
+      ]);
+      
+      setSuppliers(suppliersRes.data);
+      
+      if (criteriaRes && criteriaRes.length > 0) {
+        setCriteria(criteriaRes as QualificationCriterion[]);
+      } else {
+        // Initialize with defaults if none exist in DB
+        const defaults: QualificationCriterion[] = [
+          { id: 'iso9001', label: 'Certificazione ISO 9001', type: 'BOOLEAN', weight: 15, isActive: true, category: 'CERTIFICATION' },
+          { id: 'financial', label: 'Solidità Finanziaria', type: 'SCORE', weight: 25, isActive: true, category: 'FINANCIAL' },
+          { id: 'esg', label: 'Rating ESG', type: 'SCORE', weight: 20, isActive: true, category: 'ESG' },
+          { id: 'quality', label: 'Qualità Forniture (Storico)', type: 'SCORE', weight: 30, isActive: true, category: 'OPERATIONAL' },
+          { id: 'ethics', label: 'Codice Etico', type: 'BOOLEAN', weight: 10, isActive: true, category: 'ESG' },
+        ];
+        setCriteria(defaults);
+        // Save defaults to DB for this client
+        for (const c of defaults) {
+          await dataService.saveQualificationCriterion(client, c, true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [client]);
+
+  const handleUpdateCriteria = async (newCriteria: QualificationCriterion[]) => {
+    setCriteria(newCriteria);
+    // Save all to DB (simplified)
+    for (const c of newCriteria) {
+      await dataService.saveQualificationCriterion(client, c, false);
+    }
+  };
 
   // --- DYNAMIC SCORE CALCULATION ---
   const calculateDynamicScore = (sup: Supplier) => {
@@ -92,11 +148,50 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
   }, [suppliers, criteria]);
 
   // --- ACTIONS ---
+  const handleCreateSupplier = () => {
+    setEditingSupplier(null);
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleEditSupplier = (sup: Supplier) => {
+    setEditingSupplier(sup);
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleSaveSupplier = async (formData: any) => {
+    try {
+      const isNew = !editingSupplier;
+      await dataService.saveSupplier(client, formData, isNew);
+      setIsSupplierModalOpen(false);
+      setSuccess("Fornitore salvato con successo!");
+      setTimeout(() => setSuccess(null), 3000);
+      fetchData();
+    } catch (err: any) {
+      setError(`Errore salvataggio fornitore: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    try {
+      await dataService.deleteSupplier(id);
+      setIsSupplierModalOpen(false);
+      setSelectedSupplier(null);
+      setSuccess("Fornitore eliminato con successo!");
+      setTimeout(() => setSuccess(null), 3000);
+      fetchData();
+    } catch (err: any) {
+      setError(`Errore eliminazione fornitore: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
   const handleExportPDF = () => {
     setIsExporting(true);
     setTimeout(() => {
         setIsExporting(false);
-        alert("Report Qualifica Fornitori (PDF) generato e scaricato!");
+        setSuccess("Report Qualifica Fornitori (PDF) generato e scaricato!");
+        setTimeout(() => setSuccess(null), 3000);
     }, 1500);
   };
 
@@ -112,31 +207,56 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
   };
 
   return (
-    <div className="flex flex-col h-auto lg:h-full space-y-6">
+    <div className="flex flex-col min-h-full space-y-6 relative">
+      {error && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-red-50 border border-red-200 rounded-xl shadow-xl text-red-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-green-50 border border-green-200 rounded-xl shadow-xl text-green-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          {success}
+        </div>
+      )}
       
       <CriteriaManagerModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         criteria={criteria} 
-        onUpdateCriteria={setCriteria} 
+        onUpdateCriteria={handleUpdateCriteria} 
       />
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-700">Qualifica Fornitori</h2>
-          <p className="text-sm text-slate-500 font-medium">Gestione Audit e Vendor Rating</p>
-        </div>
+      <MasterDataModal 
+        isOpen={isSupplierModalOpen}
+        onClose={() => setIsSupplierModalOpen(false)}
+        type="SUPPLIERS"
+        initialData={editingSupplier}
+        onSave={handleSaveSupplier}
+        onDelete={handleDeleteSupplier}
+        client={client}
+      />
+
+      <div className="flex justify-end">
         <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="neu-btn px-4 py-2 text-slate-600 text-sm flex-1 sm:flex-none whitespace-nowrap"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            Configura Parametri
-          </button>
-          <button className="neu-btn px-4 py-2 text-blue-600 text-sm font-bold flex-1 sm:flex-none whitespace-nowrap">
-            + Nuovo Fornitore
-          </button>
+          <Tooltip position="bottom" className="flex-1 sm:flex-none" content={{ title: "Configurazione Parametri", description: "Definisci i criteri di valutazione e i relativi pesi per lo scoring dei fornitori.", usage: "Modifica pesi e soglie di idoneità." }}>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="neu-btn px-4 py-2 text-slate-600 text-sm w-full whitespace-nowrap"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              Configura Parametri
+            </button>
+          </Tooltip>
+          <Tooltip position="bottom" className="flex-1 sm:flex-none" content={{ title: "Nuovo Fornitore", description: "Aggiungi un nuovo fornitore al database per la qualificazione.", usage: "Clicca per inserire i dati anagrafici." }}>
+            <button 
+              onClick={handleCreateSupplier}
+              className="neu-btn px-4 py-2 text-blue-600 text-sm font-bold w-full whitespace-nowrap"
+            >
+              + Nuovo Fornitore
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -184,8 +304,16 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
                <div className="neu-flat p-8 relative overflow-hidden">
                   <div className="flex justify-between items-start z-10 relative">
                      <div>
-                       <h2 className="text-xl sm:text-2xl font-black text-slate-700 mb-1">{selectedSupplier.name}</h2>
-                       <p className="text-slate-500 text-sm mb-4">Ultimo Audit: <b>{selectedSupplier.auditDate}</b></p>
+                       <div className="flex items-center gap-4 mb-1">
+                         <h2 className="text-xl sm:text-2xl font-black text-slate-700">{selectedSupplier.name}</h2>
+                         <button 
+                           onClick={() => handleEditSupplier(selectedSupplier)}
+                           className="text-blue-600 hover:text-blue-800"
+                         >
+                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                         </button>
+                       </div>
+                       <p className="text-slate-500 text-sm mb-4">Ultimo Audit: <b>{selectedSupplier.auditDate || 'N/D'}</b></p>
                        <div className="flex space-x-2">
                          {getStatusBadge(selectedSupplier.status)}
                        </div>
@@ -208,13 +336,13 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
                  {/* Mini Matrix - Keeping it as "Quality vs Price" for now, can be updated later */}
                  <div className="neu-flat p-6">
                     <h4 className="text-sm font-bold text-slate-600 mb-4 uppercase">Posizionamento Strategico</h4>
-                    <div className="h-48 w-full min-h-[192px]">
-                       <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-48 w-full min-h-[192px] min-w-0">
+                       <ResponsiveContainer width="100%" height={192} minWidth={0} minHeight={0} debounce={50}>
                           <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
                               <CartesianGrid stroke="#d1d9e6" strokeDasharray="3 3" />
                               <XAxis type="number" dataKey="x" name="Cost" hide domain={[0, 100]} />
                               <YAxis type="number" dataKey="y" name="Quality" hide domain={[0, 100]} />
-                              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                              <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} />
                               <Scatter name="Current" data={[{ x: 50, y: selectedSupplier.rating * 20, z: 100 }]} fill="#3b82f6">
                                 <Cell fill="#3b82f6" />
                               </Scatter>
@@ -237,7 +365,7 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
 
                              return (
                                 <div key={c.id} className="flex items-center justify-between text-sm border-b border-slate-100 pb-1 last:border-0">
-                                    <span className="text-slate-600 truncate mr-2" title={c.label}>{c.label}</span>
+                                    <span className="text-slate-600 mr-2" title={c.label}>{c.label}</span>
                                     <span className={`font-bold whitespace-nowrap ${rawVal !== undefined ? colorClass : 'text-slate-400'}`}>{displayVal}</span>
                                 </div>
                              );
@@ -276,13 +404,13 @@ const SupplierQualificationView: React.FC<SupplierQualificationViewProps> = ({ c
                        </button>
                    </div>
                    
-                   <div className="h-64 w-full min-h-[256px]">
-                       <ResponsiveContainer width="100%" height="100%">
+                   <div className="h-64 w-full min-h-[256px] min-w-0">
+                       <ResponsiveContainer width="100%" height={256} minWidth={0} minHeight={0} debounce={50}>
                            <BarChart data={chartData} layout="vertical" margin={{top: 5, right: 30, left: 40, bottom: 5}}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#d1d9e6" />
                                 <XAxis type="number" domain={[0, 100]} hide />
                                 <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 11, fill:'#64748b', fontWeight:700}} axisLine={false} tickLine={false} />
-                                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{background: '#EEF2F6', border: 'none', boxShadow: '5px 5px 10px #d1d9e6', borderRadius: '12px'}} />
+                                <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{background: '#EEF2F6', border: 'none', boxShadow: '5px 5px 10px #d1d9e6', borderRadius: '12px'}} />
                                 <Legend iconType="circle" />
                                 {/* Stacked Bars */}
                                 <Bar dataKey="CERTIFICATION" name="Certificazioni" stackId="a" fill="#3b82f6" barSize={20} />

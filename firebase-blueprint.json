@@ -1,0 +1,152 @@
+{
+  "entities": {
+    "eb_pro_admins": {
+      "title": "EB-pro Admin",
+      "description": "System administrators for EB-pro",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["ADMIN", "SUPER_ADMIN"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
+    },
+    "clients": {
+      "title": "Client",
+      "description": "Industrial entities managed by EB-pro",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo_url": { "type": "string", "format": "uri" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "suppliers": {
+      "title": "Supplier",
+      "description": "Suppliers for a specific client",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "name": { "type": "string" },
+        "nickname": { "type": "string" },
+        "rating": { "type": "number" },
+        "email": { "type": "string", "format": "email" },
+        "payment_terms": { "type": "string" },
+        "phone": { "type": "string" },
+        "legalAddress": { "type": "object" },
+        "operationalAddress": { "type": "object" },
+        "status": { "type": "string", "enum": ["QUALIFIED", "PENDING", "EXPIRED", "REJECTED"] },
+        "qualification_data": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "name"]
+    },
+    "items": {
+      "title": "Item",
+      "description": "Inventory items for a specific client",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "macro_family": { "type": "string" },
+        "family": { "type": "string" },
+        "group_name": { "type": "string" },
+        "stock": { "type": "number" },
+        "safety_stock": { "type": "number" },
+        "unit": { "type": "string" },
+        "weight_kg": { "type": "number" },
+        "cost": { "type": "number" },
+        "currency": { "type": "string" },
+        "preferred_supplier_id": { "type": "string" },
+        "lead_time_days": { "type": "integer" },
+        "revision": { "type": "string" },
+        "variant": { "type": "string" },
+        "progressive": { "type": "string" },
+        "customer_code": { "type": "string" },
+        "manufacturer_info": { "type": "object" },
+        "technical_specs": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "sku", "name"]
+    },
+    "customers": {
+      "title": "Customer",
+      "description": "Customers of a specific client",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "vat_number": { "type": "string" },
+        "address": { "type": "string" },
+        "region": { "type": "string" },
+        "payment_terms": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "name"]
+    },
+    "purchase_orders": {
+      "title": "Purchase Order",
+      "description": "Purchase orders for a specific client",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "po_number": { "type": "string" },
+        "supplier_id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["DRAFT", "SENT", "CONFIRMED", "SHIPPED", "RECEIVED"] },
+        "total_amount": { "type": "number" },
+        "notes": { "type": "string" },
+        "tracking_code": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "po_number"]
+    },
+    "logistics_events": {
+      "title": "Logistics Event",
+      "description": "Logistics events for a specific client",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["INBOUND", "OUTBOUND"] },
+        "reference_id": { "type": "string" },
+        "event_date": { "type": "string", "format": "date-time" },
+        "courier": { "type": "string" },
+        "tracking_code": { "type": "string" },
+        "status": { "type": "string", "enum": ["TRANSIT", "DELIVERED", "EXCEPTION"] },
+        "items_count": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "type"]
+    },
+    "classification_hierarchy": {
+      "title": "Classification Hierarchy",
+      "description": "Hierarchical classification levels for items",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "name": { "type": "string" },
+        "level": { "type": "integer", "enum": [0, 1, 2, 3] },
+        "parent_id": { "type": "string" },
+        "code": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "name", "level"]
+    }
+  },
+  "firestore": {
+    "eb_pro_admins": { "schema": "eb_pro_admins", "description": "System administrators" },
+    "clients": { "schema": "clients", "description": "Industrial clients" },
+    "suppliers": { "schema": "suppliers", "description": "Client suppliers" },
+    "items": { "schema": "items", "description": "Client inventory items" },
+    "customers": { "schema": "customers", "description": "Client customers" },
+    "purchase_orders": { "schema": "purchase_orders", "description": "Client purchase orders" },
+    "logistics_events": { "schema": "logistics_events", "description": "Client logistics events" },
+    "classification_hierarchy": { "schema": "classification_hierarchy", "description": "Item classification levels" }
+  }
+}

@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: eb_pro_admins
+    // Document ID: Firebase Auth UID
+    // Fields:
+    //   - email: string (required, email format)
+    //   - role: string (ADMIN, SUPER_ADMIN)
+    //   - created_at: string (ISO date)
+    //
+    // Collection: clients
+    // Fields:
+    //   - name: string (required, max 100)
+    //   - logo_url: string (optional, URL)
+    //
+    // Collection: items
+    // Fields:
+    //   - client_id: string (required)
+    //   - sku: string (required, unique per client)
+    //   - name: string (required)
+    //   - stock: number
+    //   - safety_stock: number
+    //   - [other technical fields]
+    //
+    // Collection: suppliers, customers, purchase_orders, logistics_events, classification_hierarchy
+    // All scoped by client_id.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "vitoloiudice@gmail.com" || 
+         exists(/databases/$(database)/documents/eb_pro_admins/$(request.auth.uid)));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= minLen && 
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidItem(data) {
+      return data.client_id is string && 
+             data.sku is string && data.sku.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             data.stock is number &&
+             data.safety_stock is number;
+    }
+
+    function isValidSupplier(data) {
+      return data.client_id is string && 
+             data.name is string && data.name.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // EB-pro Admins: Only admins can manage other admins
+    match /eb_pro_admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Clients: Only admins can manage clients and their sub-settings
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+      
+      match /{allPaths=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Operational Data: Scoped by client_id, only admins can manage
+    match /suppliers/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidSupplier(request.resource.data);
+      allow update: if isAdmin() && isValidSupplier(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /items/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidItem(request.resource.data);
+      allow update: if isAdmin() && isValidItem(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /customers/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /purchase_orders/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /logistics_events/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /classification_hierarchy/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /bom_lines/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -55,7 +55,7 @@ const CriteriaManagerModal: React.FC<CriteriaManagerModalProps> = ({ isOpen, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-[#EEF2F6] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#EEF2F6] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-white/50">
@@ -68,10 +68,10 @@ const CriteriaManagerModal: React.FC<CriteriaManagerModalProps> = ({ isOpen, onC
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-auto custom-scrollbar">
             
             {/* LEFT: Existing Criteria List */}
-            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar border-r border-slate-200">
+            <div className="flex-1 p-4 sm:p-6 border-r border-slate-200 min-w-[300px]">
                 <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wide mb-4">Criteri Attivi</h4>
                 <div className="space-y-4">
                     {localCriteria.map(c => (
@@ -112,7 +112,7 @@ const CriteriaManagerModal: React.FC<CriteriaManagerModalProps> = ({ isOpen, onC
             </div>
 
             {/* RIGHT: Add New */}
-            <div className="w-full md:w-1/3 p-6 bg-slate-50/50">
+            <div className="w-full md:w-1/3 p-4 sm:p-6 bg-slate-50/50 min-w-[250px]">
                 <h4 className="text-sm font-bold text-slate-600 uppercase tracking-wide mb-4">Nuovo Parametro</h4>
                 <div className="neu-flat p-6 space-y-4">
                     <div>

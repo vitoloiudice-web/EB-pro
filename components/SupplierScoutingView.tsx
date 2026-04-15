@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { Company, Item, Supplier, ScoutingResult } from '../types';
-import { googleSheetsService } from '../services/googleSheetsService';
+import React, { useState, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Client, Item, Supplier, ScoutingResult } from '../types';
+import Tooltip from './common/Tooltip';
+import { dataService } from '../services/dataService';
 import { geminiService } from '../services/geminiService';
 import { usePaginatedData } from '../hooks/usePaginatedData';
 import ScoutingActionModal from './ScoutingActionModal';
 
 interface SupplierScoutingViewProps {
-  company: Company;
+  client: Client;
 }
 
-const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) => {
+const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ client }) => {
   // Mode Selection: Scout for Item Alternative OR Supplier Competitor
   const [scoutMode, setScoutMode] = useState<'ITEM' | 'SUPPLIER'>('ITEM');
 
@@ -19,30 +21,42 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
   
   const [isSearching, setIsSearching] = useState(false);
   const [scoutingResult, setScoutingResult] = useState<ScoutingResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   // Modal State
   const [isActionModalOpen, setActionModalOpen] = useState(false);
   const [selectedCandidateName, setSelectedCandidateName] = useState('');
+  const [isCandidateInputOpen, setIsCandidateInputOpen] = useState(false);
 
   // Fetch Items 
+  const fetchItems = useCallback((p: number, s: number, q: string) => {
+    if (!client) return Promise.resolve({ data: [], total: 0 });
+    return dataService.getItems(client as any, p, s, q);
+  }, [client]);
+
   const { 
       data: items, 
       loading: loadingItems, 
       setSearch: setSearchItems, 
       search: searchItemsTerm 
   } = usePaginatedData<Item>({
-    fetchMethod: (p, s, q) => googleSheetsService.getItems(company, p, s, q),
+    fetchMethod: fetchItems,
     pageSize: 10
   });
 
   // Fetch Suppliers
+  const fetchSuppliers = useCallback((p: number, s: number, q: string) => {
+    if (!client) return Promise.resolve({ data: [], total: 0 });
+    return dataService.getSuppliers(client as any, p, s, q);
+  }, [client]);
+
   const { 
       data: suppliers, 
       loading: loadingSuppliers, 
       setSearch: setSearchSuppliers, 
       search: searchSuppliersTerm 
   } = usePaginatedData<Supplier>({
-    fetchMethod: (p, s, q) => googleSheetsService.getSuppliers(company, p, s, q),
+    fetchMethod: fetchSuppliers,
     pageSize: 10
   });
 
@@ -75,16 +89,20 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
         setScoutingResult(result);
     } catch (error) {
         console.error(error);
-        alert("Errore durante la ricerca.");
+        setError("Errore durante la ricerca.");
+        setTimeout(() => setError(null), 5000);
     } finally {
         setIsSearching(false);
     }
   };
 
   const openActionModal = () => {
-      const name = prompt("Inserisci il nome del candidato per cui generare i documenti:");
-      if (name) {
-          setSelectedCandidateName(name);
+      setIsCandidateInputOpen(true);
+  };
+
+  const handleConfirmCandidate = () => {
+      if (selectedCandidateName.trim()) {
+          setIsCandidateInputOpen(false);
           setActionModalOpen(true);
       }
   };
@@ -99,7 +117,45 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
   );
 
   return (
-    <div className="flex flex-col h-full space-y-6 animate-fade-in relative">
+    <div className="flex flex-col min-h-full space-y-6 animate-fade-in relative">
+      {error && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-red-50 border border-red-200 rounded-xl shadow-xl text-red-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
+        </div>
+      )}
+
+      {isCandidateInputOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 animate-fade-in">
+            <h3 className="text-lg font-bold text-slate-700 mb-4">Inserisci Candidato</h3>
+            <p className="text-sm text-slate-500 mb-4">Inserisci il nome del candidato per cui generare i documenti di contatto.</p>
+            <input 
+              type="text"
+              className="neu-input w-full px-4 py-2 mb-6"
+              placeholder="Nome Candidato / Azienda"
+              value={selectedCandidateName}
+              onChange={(e) => setSelectedCandidateName(e.target.value)}
+              autoFocus
+            />
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsCandidateInputOpen(false)}
+                className="neu-btn px-4 py-2 text-slate-600"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={handleConfirmCandidate}
+                disabled={!selectedCandidateName.trim()}
+                className="neu-btn px-4 py-2 text-white bg-blue-600 disabled:opacity-50"
+              >
+                Conferma
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {(selectedItem || selectedSupplier) && (
           <ScoutingActionModal 
@@ -107,16 +163,13 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
             onClose={() => setActionModalOpen(false)}
             candidateName={selectedCandidateName}
             itemName={scoutMode === 'ITEM' ? selectedItem!.name : 'Servizi Fornitura'}
-            companyName={company.name}
+            companyName={client.name}
           />
       )}
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-700">Supplier Scouting AI</h2>
-          <p className="text-sm text-slate-500 font-medium">Motore di ricerca strategico per alternative e competitors</p>
-        </div>
+      <div className="flex justify-end">
+        {/* Actions could go here if needed */}
       </div>
 
       {/* LAYOUT FIX: Added min-h-0 to allow flex container to handle overflow correctly */}
@@ -133,18 +186,22 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                 
                 {/* Mode Toggle */}
                 <div className="flex p-1 bg-slate-200 rounded-xl mb-4">
-                    <button 
-                        onClick={() => handleModeSwitch('ITEM')}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${scoutMode === 'ITEM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Per Articolo
-                    </button>
-                    <button 
-                        onClick={() => handleModeSwitch('SUPPLIER')}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${scoutMode === 'SUPPLIER' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Per Fornitore
-                    </button>
+                    <Tooltip position="bottom" className="flex-1" content={{ title: "Scouting per Articolo", description: "Cerca nuovi fornitori basandoti sulle specifiche tecniche di un articolo.", usage: "Seleziona un articolo dalla lista sottostante." }}>
+                      <button 
+                          onClick={() => handleModeSwitch('ITEM')}
+                          className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${scoutMode === 'ITEM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          Per Articolo
+                      </button>
+                    </Tooltip>
+                    <Tooltip position="bottom" className="flex-1" content={{ title: "Scouting per Fornitore", description: "Cerca alternative o benchmark basandoti sul profilo di un fornitore esistente.", usage: "Seleziona un fornitore dalla lista sottostante." }}>
+                      <button 
+                          onClick={() => handleModeSwitch('SUPPLIER')}
+                          className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${scoutMode === 'SUPPLIER' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                          Per Fornitore
+                      </button>
+                    </Tooltip>
                 </div>
 
                 <input 
@@ -157,8 +214,7 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                 <div className="overflow-y-auto custom-scrollbar flex-1 space-y-2 pr-2 min-h-[300px] max-h-[500px]">
                     {/* Render Items List with Stale-While-Revalidate pattern to avoid flicker */}
                     {scoutMode === 'ITEM' && (
-                        <>
-                            {/* Only show Skeleton if we have NO data and are loading. Otherwise show dimmed stale data */}
+                        <div className="relative min-h-[300px]">
                             {loadingItems && items.length === 0 ? (
                                 <ListSkeleton />
                             ) : (
@@ -176,19 +232,19 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                                             </div>
                                         </div>
                                     ))}
-                                    {items.length === 0 && (
+                                    {items.length === 0 && !loadingItems && (
                                          <div className="p-8 text-center text-slate-400 italic text-xs border-2 border-dashed border-slate-200 rounded-xl">
                                             Nessun articolo trovato.
                                          </div>
                                     )}
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
 
                     {/* Render Suppliers List */}
                     {scoutMode === 'SUPPLIER' && (
-                        <>
+                        <div className="relative min-h-[300px]">
                              {loadingSuppliers && suppliers.length === 0 ? (
                                 <ListSkeleton />
                             ) : (
@@ -209,14 +265,14 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                                             </div>
                                         </div>
                                     ))}
-                                     {suppliers.length === 0 && (
+                                     {suppliers.length === 0 && !loadingSuppliers && (
                                          <div className="p-8 text-center text-slate-400 italic text-xs border-2 border-dashed border-slate-200 rounded-xl">
                                             Nessun fornitore trovato.
                                          </div>
                                     )}
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
@@ -252,23 +308,25 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                         </div>
                     </div>
                     
-                    <button 
-                        onClick={handleScout}
-                        disabled={isSearching}
-                        className={`w-full neu-btn py-4 text-white font-bold shadow-lg flex items-center justify-center ${isSearching ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}
-                    >
-                        {isSearching ? (
-                            <>
-                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
-                                Ricerca in corso...
-                            </>
-                        ) : (
-                            <>
-                               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                Avvia Scouting AI
-                            </>
-                        )}
-                    </button>
+                    <Tooltip position="top" className="w-full" content={{ title: "Avvia Scouting AI", description: "Interroga l'intelligenza artificiale per trovare fornitori alternativi o benchmark di mercato.", usage: "Clicca per avviare l'analisi predittiva." }}>
+                        <button 
+                            onClick={handleScout}
+                            disabled={isSearching}
+                            className={`w-full neu-btn py-4 text-white font-bold shadow-lg flex items-center justify-center ${isSearching ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}
+                        >
+                            {isSearching ? (
+                                <>
+                                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                                    Ricerca in corso...
+                                </>
+                            ) : (
+                                <>
+                                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                    Avvia Scouting AI
+                                </>
+                            )}
+                        </button>
+                    </Tooltip>
                 </div>
             )}
         </div>
@@ -314,8 +372,10 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                         
                         {/* AI Markdown Content */}
                         <div className="prose prose-sm prose-slate max-w-none">
-                            <div className="whitespace-pre-wrap font-sans text-slate-700 leading-relaxed">
-                                {scoutingResult.analysisText}
+                            <div className="font-sans text-slate-700 leading-relaxed">
+                                <ReactMarkdown>
+                                    {scoutingResult.analysisText}
+                                </ReactMarkdown>
                             </div>
                         </div>
 
@@ -339,8 +399,8 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ company }) 
                                                 <span className="text-xs font-bold">{idx + 1}</span>
                                             </div>
                                             <div className="overflow-hidden">
-                                                <p className="text-xs font-bold text-slate-700 truncate">{src.title}</p>
-                                                <p className="text-[10px] text-blue-500 truncate">{src.uri}</p>
+                                                <p className="text-xs font-bold text-slate-700">{src.title}</p>
+                                                <p className="text-[10px] text-blue-500">{src.uri}</p>
                                             </div>
                                         </a>
                                     ))}

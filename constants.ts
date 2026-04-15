@@ -1,5 +1,5 @@
 
-import { Company, AdminProfile } from './types';
+import { Client, AdminProfile } from './types';
 
 // NOTE: In a real production app, these should be environment variables.
 // For the purpose of this architecture demo, we keep them here.
@@ -10,23 +10,7 @@ export const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?ve
 export const SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
 // Multi-Tenant Configuration
-export const COMPANIES: Company[] = [
-  {
-    id: 'c1',
-    name: 'EcoCompact Spa',
-    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // PRODUCTION DB
-  },
-  {
-    id: 'c2',
-    name: 'UrbanWaste Solutions',
-    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // Shared DB for testing
-  },
-  {
-    id: 'c3',
-    name: 'HeavyDuty Trucks Ltd',
-    spreadsheetId: '1tAdkO29iGKe0g3xy0TbhNS_mkR3L4VQKHbj6A1Fgi_c', // Shared DB for testing
-  }
-];
+export const CLIENTS: Client[] = [];
 
 export const MOCK_ADMIN_PROFILE: AdminProfile = {
   companyName: "EB-pro Procurement Solutions S.r.l.",
@@ -45,22 +29,33 @@ export const MOCK_ADMIN_PROFILE: AdminProfile = {
   swift: "BCITITMM"
 };
 
-export const MOCK_ITEMS_DATA = [
-  { sku: 'HYD-VAL-001', name: 'Valvola Controllo Flusso', category: 'Idraulica', stock: 12, safetyStock: 20, cost: 150, supplierId: 'SUP-01' },
-  { sku: 'STL-PLT-5MM', name: 'Piastra Acciaio 5mm', category: 'Carpenteria', stock: 500, safetyStock: 200, cost: 45, supplierId: 'SUP-02' },
-  { sku: 'ELC-PLC-X2', name: 'Centralina PLC Veicolare', category: 'Elettronica', stock: 5, safetyStock: 10, cost: 800, supplierId: 'SUP-03' },
-  { sku: 'PNT-YEL-RAL', name: 'Vernice Gialla RAL1023', category: 'Verniciatura', stock: 50, safetyStock: 40, cost: 20, supplierId: 'SUP-04' },
-  { sku: 'WLD-ROD-X1', name: 'Elettrodi Saldatura Inox', category: 'Saldatura', stock: 1000, safetyStock: 500, cost: 0.5, supplierId: 'SUP-02' },
+export const ITEM_GROUPS = [
+  { name: 'Cassa/Vasca', code: 'VA' },
+  { name: 'Telaio', code: 'TE' },
+  { name: 'Compattazione', code: 'KO' },
+  { name: 'Cabina', code: 'CA' }
 ];
 
-export const MOCK_SUPPLIERS = [
-  { id: 'SUP-01', name: 'HydraForce Italia', rating: 4.8, email: 'sales@hydraforce.it', paymentTerms: '60 DFFM' },
-  { id: 'SUP-02', name: 'Acciaierie Venete', rating: 4.2, email: 'ordini@acciaierie.it', paymentTerms: '30 DF' },
-  { id: 'SUP-03', name: 'AutoElectric Pro', rating: 3.9, email: 'info@autoelectric.com', paymentTerms: 'RB 30/60' },
-];
-
-export const MOCK_CUSTOMERS = [
-  { id: 'CUST-01', name: 'Municipalità di Milano', email: 'appalti@comune.milano.it', vatNumber: '01199250158', address: 'Piazza della Scala, 2', region: 'Lombardia', paymentTerms: 'Bonifico 30gg' },
-  { id: 'CUST-02', name: 'Roma Multiservizi', email: 'acquisti@romamultiservizi.it', vatNumber: '05438871003', address: 'Via Tiburtina 100', region: 'Lazio', paymentTerms: 'Bonifico 60gg' },
-  { id: 'CUST-03', name: 'Hera SpA', email: 'procurement@gruppohera.it', vatNumber: '04245520376', address: 'Viale Berti Pichat 2/4', region: 'Emilia-Romagna', paymentTerms: 'Bonifico 90gg' },
-];
+export const ITEM_HIERARCHY: Record<string, { code: string, macrofamilies: Record<string, { code: string, families: string[] }> }> = {
+  'Diretto': {
+    code: 'D',
+    macrofamilies: {
+      'Carpenteria': { code: 'CAR', families: ['Laminato', 'Profilato'] },
+      'Torneria': { code: 'TOR', families: ['Spinotto', 'Flangia'] },
+      'Oleodinamica': { code: 'OLE', families: ['Cilindro', 'Distributore', 'Pompa', 'PTO', 'Centralina', 'Valvola', 'Filtrazione', 'Serbatoio', 'Raccorderia', 'Tubo', 'Olio'] },
+      'Elettrica': { code: 'ELE', families: ['Cavo', 'Logica', 'IOT 4.0', 'Illuminazione', 'Audio-Video', 'Componente', 'Minuteria'] },
+      'Pneumatica': { code: 'PNE', families: ['Attuatore', 'Filtrazione', 'Componente'] },
+      'Gomma': { code: 'GOM', families: ['Battuta', 'Protezione', 'Copertura'] },
+      'Ferramenta': { code: 'FER', families: ['Vite', 'Bullone', 'Dado', 'Minuteria'] },
+      'Verniciatura': { code: 'VER', families: ['Smalto', 'Catalizzatore', 'Solvente', 'Sigillante', 'Stucco'] },
+      'Finitura': { code: 'FIN', families: ['Carrozzeria', 'Segnaletica'] }
+    }
+  },
+  'Indiretto': {
+    code: 'I',
+    macrofamilies: {
+      'Canone': { code: 'CAN', families: ['Energia', 'Finanziario', 'Fabbricato', 'Macchinario'] },
+      'Strumentale': { code: 'STR', families: ['Preparazione', 'Utensile', 'Sicurezza', 'Formazione', 'DPI', 'Stoccaggio', 'Movimentazione'] }
+    }
+  }
+};

@@ -20,14 +20,27 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
   const [search, setSearch] = useState(initialSearch);
   const [error, setError] = useState<string | null>(null);
 
-  // Debounce ref for search
-  const timeoutRef = useRef<any>(null);
+  // Use a ref for fetchMethod to avoid it being a dependency for the fetch logic
+  // while still using the latest version.
+  const fetchMethodRef = useRef(fetchMethod);
+  useEffect(() => {
+    fetchMethodRef.current = fetchMethod;
+  }, [fetchMethod]);
 
-  const fetchData = useCallback(async (currentPage: number, currentSearch: string) => {
+  // Track last fetched parameters to avoid infinite loops
+  const lastFetchedRef = useRef({ page: -1, search: '___' });
+
+  const fetchData = useCallback(async (currentPage: number, currentSearch: string, force = false) => {
+    // Avoid redundant fetches if parameters haven't changed (unless forced)
+    if (!force && lastFetchedRef.current.page === currentPage && lastFetchedRef.current.search === currentSearch) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchMethod(currentPage, pageSize, currentSearch);
+      const result = await fetchMethodRef.current(currentPage, pageSize, currentSearch);
+      lastFetchedRef.current = { page: currentPage, search: currentSearch };
       setData(result.data);
       setTotal(result.total);
     } catch (err: any) {
@@ -38,31 +51,29 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
     } finally {
       setLoading(false);
     }
-  }, [fetchMethod, pageSize]);
+  }, [pageSize]);
 
-  // Effect for Page changes
+  // Effect for Page or Search changes
   useEffect(() => {
-    fetchData(page, search);
-  }, [page, fetchData]); // Search excluded from dependency to handle it via debounce separately
-
-  // Handle Search with Debounce
-  const handleSearch = (term: string) => {
-    setSearch(term);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    const timer = setTimeout(() => {
+      fetchData(page, search);
+    }, search ? 400 : 0);
     
-    timeoutRef.current = setTimeout(() => {
-      setPage(1); // Reset to page 1 on search
-      fetchData(1, term);
-    }, 400); // 400ms debounce
-  };
+    return () => clearTimeout(timer);
+  }, [page, search, fetchData]);
 
-  const refresh = () => {
-    fetchData(page, search);
-  };
+  const refresh = useCallback(() => {
+    fetchData(page, search, true); // Force refresh
+  }, [fetchData, page, search]);
+
+  const handleSearch = useCallback((term: string) => {
+    setSearch(term);
+    setPage(1);
+  }, []);
 
   return {
     data,
-    setData, // Exposed for Optimistic Updates
+    setData,
     total,
     loading,
     error,

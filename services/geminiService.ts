@@ -6,23 +6,22 @@ import { GOOGLE_API_KEY } from "../constants";
 const API_KEY = process.env.API_KEY || GOOGLE_API_KEY;
 
 // Note: Using a system instruction to set the persona
-const SYSTEM_INSTRUCTION = `Sei un esperto analista di approvvigionamento AI per un ERP di produzione di compattatori per rifiuti. 
-Il tuo obiettivo è analizzare i dati dell'inventario e dei fornitori per identificare opportunità di risparmio, rischi e KPI di performance.`;
+const SYSTEM_INSTRUCTION = `Esperto procurement AI. Analisi dati inventario/fornitori. Trova risparmi, rischi, KPI. Risposte brevi, stile telegrafico.`;
 
 export const geminiService = {
   analyzeProcurementData: async (items: Item[], suppliers: Supplier[]): Promise<AiAnalysisResult> => {
     // 1. Prepare context for the AI
     const dataContext = JSON.stringify({
-      inventorySummary: items.map(i => ({ sku: i.sku, name: i.name, stock: i.stock, cost: i.cost, supplier: i.supplierId })),
-      supplierSummary: suppliers.map(s => ({ id: s.id, name: s.name, rating: s.rating }))
+      inv: items.map(i => ({ sku: i.sku, stock: i.stock, cost: i.cost, sid: i.supplierId })),
+      sup: suppliers.map(s => ({ id: s.id, rat: s.rating }))
     });
 
     const prompt = `
-    Analizza i seguenti dati JSON che rappresentano il nostro inventario attuale e la lista fornitori.
-    1. Calcola il valore totale dell'inventario attuale.
-    2. Identifica il fornitore principale per volume di articoli collegati.
-    3. Suggerisci eventuali rischi basati su bassi livelli di scorta (assumi logica scorta di sicurezza).
-    4. Restituisci una risposta strutturata con un riepilogo, 3 KPI distinti e raccomandazioni operative.
+    Analizza JSON.
+    1. Valore totale stock.
+    2. Fornitore top volume.
+    3. Rischi concentrazione/mancanza alternative.
+    4. Output: riepilogo breve, 3 KPI, raccomandazioni operative.
     
     Dati: ${dataContext}
     `;
@@ -71,6 +70,7 @@ export const geminiService = {
       // More descriptive error for debugging
       let errorMessage = "Servizio AI non disponibile.";
       if (error.message?.includes("404")) errorMessage = "Modello AI non trovato o API Key non valida.";
+      if (error.message?.includes("429") || error.status === "RESOURCE_EXHAUSTED") errorMessage = "Quota API superata. Riprova più tardi.";
       
       // Fallback response
       return {
@@ -128,7 +128,7 @@ export const geminiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Use Pro for complex reasoning + search
+        model: 'gemini-3.1-pro-preview', // Use Pro for complex reasoning + search
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }] // Enable Google Search Grounding
@@ -145,7 +145,8 @@ export const geminiService = {
 
       // Remove duplicates based on URI
       const uniqueSources = Array.from(new Set(sources.map((s: any) => s.uri)))
-        .map(uri => sources.find((s: any) => s.uri === uri));
+        .map(uri => sources.find((s: any) => s.uri === uri))
+        .filter(Boolean) as { title: string; uri: string; }[];
 
       return {
         analysisText: response.text || "Nessun risultato trovato.",
@@ -167,14 +168,14 @@ export const geminiService = {
     let prompt = "";
     if (type === 'RFI') {
       prompt = `Scrivi una email formale di Request For Information (RFI) indirizzata a "${candidateName}". 
-      Noi siamo "${companyName}". Siamo interessati al loro prodotto "${itemName}" per la nostra produzione di compattatori.
-      Chiedi informazioni su capacità produttiva, certificazioni ISO e lead time standard. Tono professionale ma diretto.`;
+      Noi siamo "${companyName}", una Centrale Acquisti. Siamo interessati al vostro prodotto "${itemName}" per la fornitura ai nostri clienti.
+      Chiedi informazioni su capacità di fornitura, certificazioni, lead time standard e disponibilità al drop-shipping. Tono professionale ma diretto.`;
     } else if (type === 'NDA') {
-      prompt = `Genera un breve testo per un accordo di riservatezza (NDA) standard tra "${companyName}" e "${candidateName}".
-      Oggetto: Scambio informazioni tecniche per fornitura di "${itemName}". Includi clausole standard su durata (2 anni) e penali generiche.`;
+      prompt = `Genera un breve testo per un accordo di riservatezza (NDA) standard tra "${companyName}" (Centrale Acquisti) e "${candidateName}".
+      Oggetto: Scambio informazioni tecniche e commerciali per fornitura di "${itemName}". Includi clausole standard su durata (2 anni) e penali generiche.`;
     } else if (type === 'RFQ') {
       prompt = `Scrivi una email di Request For Quotation (RFQ) per "${candidateName}".
-      Richiediamo quotazione per 1000 unità di "${itemName}". Chiedi scontistica per volumi, termini di pagamento e resa (Incoterms).`;
+      Noi siamo "${companyName}", una Centrale Acquisti. Richiediamo quotazione per la fornitura di "${itemName}". Chiedi listini dedicati, scontistica per volumi, termini di pagamento e condizioni per spedizioni in drop-shipping direttamente ai nostri clienti.`;
     }
 
     try {

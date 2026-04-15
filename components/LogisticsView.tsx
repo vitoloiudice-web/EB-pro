@@ -1,46 +1,116 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Company, PurchaseOrder, LogisticsEvent, Supplier } from '../types';
-import { googleSheetsService } from '../services/googleSheetsService';
+import { Client, PurchaseOrder, LogisticsEvent, Supplier } from '../types';
+import Tooltip from './common/Tooltip';
+import { dataService } from '../services/dataService';
 import Pagination from './common/Pagination';
 import ImportWizard from './ImportWizard';
+import PurchaseOrderModal from './PurchaseOrderModal';
 import { usePaginatedData } from '../hooks/usePaginatedData';
 
 interface LogisticsViewProps {
-  company: Company;
+  client: Client;
   initialFilter?: string;
 }
 
-const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter }) => {
-  const [activeTab, setActiveTab] = useState<'ORDERS' | 'INBOUND'>('ORDERS');
+const LogisticsView: React.FC<LogisticsViewProps> = ({ client, initialFilter }) => {
+  const [activeTab, setActiveTab] = useState<'ORDERS' | 'DROP_SHIPPING'>('ORDERS');
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
-  // --- STATISTICS (Separate fetch, lightweight) ---
+  // --- STATISTICS ---
   const [stats, setStats] = useState({ openOrders: 0, incomingValue: 0, delayed: 0 });
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   useEffect(() => {
-      // In a real optimized app, this would be a separate aggregation API endpoint
-      // For now we simulate it by fetching a small subset or metadata
       const loadStats = async () => {
-          // This is a placeholder. Real implementation would call a summary endpoint.
-          setStats({ openOrders: 12, incomingValue: 45000, delayed: 2 });
+          if (!client) {
+              setStats({ openOrders: 0, incomingValue: 0, delayed: 0 });
+              return;
+          }
+          try {
+              // Fetch aggregated stats from dataService
+              const statsData = await dataService.getLogisticsStats(client);
+              setStats(statsData);
+          } catch (err) {
+              console.error("Failed to fetch logistics stats:", err);
+              setStats({ openOrders: 0, incomingValue: 0, delayed: 0 });
+          }
       };
       loadStats();
-  }, [company]);
+  }, [client]);
 
   // --- ACTIONS ---
-  const createOrder = () => alert("Logica creazione ordine: Apertura modale selezione articoli da MRP.");
-  const importOrders = (newOrders: PurchaseOrder[]) => alert("Import completato (aggiornare lista).");
-  const receiveGoods = (id: string) => alert(`Ricezione merce per Ordine ${id}`);
-  const downloadDDT = (id: string) => alert(`Download DDT ${id}`);
+  const handleCreateOrder = () => {
+    setEditingOrder(null);
+    setIsOrderModalOpen(true);
+  };
+
+  const handleEditOrder = (order: PurchaseOrder) => {
+    setEditingOrder(order);
+    setIsOrderModalOpen(true);
+  };
+
+  const handleSaveOrder = async (orderData: any) => {
+    try {
+      const isNew = !editingOrder;
+      await dataService.saveOrder(client, orderData, isNew);
+      setIsOrderModalOpen(false);
+      setSuccess("Ordine salvato con successo!");
+      setTimeout(() => setSuccess(null), 3000);
+      refresh();
+    } catch (err: any) {
+      setError(`Errore salvataggio ordine: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
+  const handleDeleteOrder = async (id: string) => {
+    try {
+      await dataService.deleteOrder(id);
+      setIsOrderModalOpen(false);
+      setSuccess("Ordine eliminato con successo!");
+      setTimeout(() => setSuccess(null), 3000);
+      refresh();
+    } catch (err: any) {
+      setError(`Errore eliminazione ordine: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
+  const importOrders = (newOrders: PurchaseOrder[]) => {
+    setSuccess(`Importazione di ${newOrders.length} ordini completata.`);
+    setTimeout(() => setSuccess(null), 3000);
+  };
+  const receiveGoods = (id: string) => {
+    setSuccess(`Ricezione merce per Ordine ${id} avviata.`);
+    setTimeout(() => setSuccess(null), 3000);
+  };
+  const downloadDDT = (id: string) => {
+    setSuccess(`Download DDT ${id} avviato.`);
+    setTimeout(() => setSuccess(null), 3000);
+  };
 
   // --- PAGINATED DATA FETCHING ---
-  const fetchOrders = useCallback((p: number, s: number, q: string) => googleSheetsService.getOrders(company, p, s, q), [company]);
-  const fetchEvents = useCallback((p: number, s: number, q: string) => googleSheetsService.getLogisticsEvents(company, p, s, q), [company]);
+  const fetchOrders = useCallback((p: number, s: number, q: string) => {
+    if (!client) return Promise.resolve({ data: [], total: 0 });
+    return dataService.getOrders(client as any, p, s, q);
+  }, [client]);
+  
+  const fetchEvents = useCallback((p: number, s: number, q: string) => {
+    if (!client) return Promise.resolve({ data: [], total: 0 });
+    return dataService.getLogisticsEvents(client as any, p, s, q);
+  }, [client]);
+
+  const activeFetchMethod = useMemo(() => {
+    return activeTab === 'ORDERS' ? fetchOrders : fetchEvents;
+  }, [activeTab, fetchOrders, fetchEvents]);
 
   const { 
       data, loading, total, page, setPage, search, setSearch, pageSize, refresh 
   } = usePaginatedData<PurchaseOrder | LogisticsEvent>({
-      fetchMethod: activeTab === 'ORDERS' ? fetchOrders : fetchEvents,
+      fetchMethod: activeFetchMethod,
       pageSize: 15,
       initialSearch: initialFilter || ''
   });
@@ -70,30 +140,51 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
   };
 
   return (
-    <div className="flex flex-col h-full space-y-8 relative animate-fade-in">
+    <div className="flex flex-col min-h-full space-y-6 relative animate-fade-in">
+      {error && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-red-50 border border-red-200 rounded-xl shadow-xl text-red-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="fixed top-20 right-8 z-[60] p-4 bg-green-50 border border-green-200 rounded-xl shadow-xl text-green-600 font-bold flex items-center gap-3 animate-slide-in">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          {success}
+        </div>
+      )}
       <ImportWizard 
         isOpen={isImportWizardOpen} 
         onClose={() => setIsImportWizardOpen(false)} 
         onImportComplete={handleImportSuccess}
       />
 
+      <PurchaseOrderModal 
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        initialData={editingOrder}
+        onSave={handleSaveOrder}
+        onDelete={handleDeleteOrder}
+        client={client}
+      />
+
       {/* HEADER & ACTIONS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-700">Logistica & Ordini</h2>
-          <p className="text-sm text-slate-500 font-medium">Tracking approvvigionamenti</p>
-        </div>
+      <div className="flex justify-end">
         <div className="flex flex-wrap gap-4 w-full md:w-auto">
-            <button 
-                onClick={() => setIsImportWizardOpen(true)}
-                className="neu-btn px-5 py-2 text-sm flex-1 sm:flex-none whitespace-nowrap"
-            >
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                Importa Excel
-            </button>
-            <button onClick={createOrder} className="neu-btn px-5 py-2 text-sm text-blue-600 flex-1 sm:flex-none whitespace-nowrap">
-                Nuovo Ordine
-            </button>
+            <Tooltip position="bottom" className="flex-1 sm:flex-none" content={{ title: "Importazione Massiva", description: "Carica ordini d'acquisto da file Excel esterno.", usage: "Seleziona il file e mappa le colonne nel wizard." }}>
+              <button 
+                  onClick={() => setIsImportWizardOpen(true)}
+                  className="neu-btn px-5 py-2 text-sm w-full whitespace-nowrap"
+              >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Importa Excel
+              </button>
+            </Tooltip>
+            <Tooltip position="bottom" className="flex-1 sm:flex-none" content={{ title: "Nuovo Ordine d'Acquisto", description: "Crea manualmente un nuovo ordine verso un fornitore.", usage: "Compila i dati di testata e le righe articolo." }}>
+              <button onClick={handleCreateOrder} className="neu-btn px-5 py-2 text-sm text-blue-600 w-full whitespace-nowrap">
+                  Nuovo Ordine
+              </button>
+            </Tooltip>
         </div>
       </div>
 
@@ -138,10 +229,10 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
                   Ordini Fornitori
               </button>
               <button
-                onClick={() => setActiveTab('INBOUND')}
-                className={`px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'INBOUND' ? 'neu-pressed text-blue-600' : 'neu-flat text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveTab('DROP_SHIPPING')}
+                className={`px-4 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'DROP_SHIPPING' ? 'neu-pressed text-blue-600' : 'neu-flat text-slate-500 hover:text-slate-700'}`}
               >
-                  Tracking & Inbound
+                  Spedizioni Drop-shipping
               </button>
           </div>
           <div className="relative w-full sm:w-72">
@@ -169,6 +260,7 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
                                 <th className="p-4">Rif. Ordine</th>
                                 <th className="p-4">Data</th>
                                 <th className="p-4">Fornitore</th>
+                                <th className="p-4">Destinatario (Cliente)</th>
                                 <th className="p-4 text-right">Totale</th>
                                 <th className="p-4 text-center">Stato</th>
                                 <th className="p-4 text-center">Azioni</th>
@@ -176,9 +268,9 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
                          ) : (
                              <>
                                 <th className="p-4">Riferimento</th>
+                                <th className="p-4">Mittente (Fornitore)</th>
+                                <th className="p-4">Destinatario (Cliente)</th>
                                 <th className="p-4">Corriere / Tracking</th>
-                                <th className="p-4">Data Arrivo</th>
-                                <th className="p-4 text-center">Colli</th>
                                 <th className="p-4 text-center">Stato</th>
                                 <th className="p-4 text-center">Documenti</th>
                              </>
@@ -194,21 +286,18 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
                                  <td className="p-4 font-mono font-bold text-slate-600">{order.id}</td>
                                  <td className="p-4 text-slate-500 text-sm font-medium">{order.date}</td>
                                  <td className="p-4 font-bold text-slate-700">{order.supplierName}</td>
+                                 <td className="p-4 font-bold text-slate-700">{order.customerName || '-'}</td>
                                  <td className="p-4 text-right font-mono text-slate-600">€ {order.totalAmount.toLocaleString('it-IT', {minimumFractionDigits: 2})}</td>
                                  <td className="p-4 text-center">
                                      {getStatusBadge(order.status)}
                                  </td>
                                  <td className="p-4 text-center">
-                                     {order.status === 'SHIPPED' ? (
-                                         <button 
-                                            onClick={() => receiveGoods(order.id)}
-                                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase tracking-wide"
-                                         >
-                                             Ricevi
-                                         </button>
-                                     ) : (
-                                         <button className="text-blue-600 hover:text-blue-700 font-bold text-xs uppercase tracking-wide">Dettagli</button>
-                                     )}
+                                     <button 
+                                        onClick={() => handleEditOrder(order)}
+                                        className="text-blue-600 hover:text-blue-700 font-bold text-xs uppercase tracking-wide"
+                                     >
+                                         Dettagli
+                                     </button>
                                  </td>
                              </tr>
                          ))
@@ -219,12 +308,16 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ company, initialFilter })
                                      <div className="font-bold text-slate-700">{event.referenceId}</div>
                                      <div className="text-xs text-slate-400 font-mono">{event.id}</div>
                                  </td>
+                                 <td className="p-4 font-bold text-slate-700">
+                                     {event.supplierId || '-'}
+                                 </td>
+                                 <td className="p-4 font-bold text-slate-700">
+                                     {event.customerId || '-'}
+                                 </td>
                                  <td className="p-4">
                                      <div className="text-slate-700 font-medium">{event.courier}</div>
                                      <div className="text-xs text-blue-500 font-mono">{event.tracking}</div>
                                  </td>
-                                 <td className="p-4 text-slate-500 font-medium">{event.date}</td>
-                                 <td className="p-4 text-center font-mono text-slate-600 font-bold">{event.itemsCount}</td>
                                  <td className="p-4 text-center">
                                      {getStatusBadge(event.status)}
                                  </td>
