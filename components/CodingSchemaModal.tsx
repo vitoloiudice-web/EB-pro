@@ -245,7 +245,7 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Category Switch */}
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
+            <div className="flex flex-shrink-0 bg-slate-100 p-1 rounded-xl mb-4">
               <button
                 onClick={() => setActiveCategory('DIRETTO')}
                 className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
@@ -264,7 +264,7 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
               </button>
             </div>
 
-            <div className="flex overflow-x-auto border-b border-slate-200 mb-3 pb-2 gap-2">
+            <div className="flex flex-shrink-0 overflow-x-auto border-b border-slate-200 mb-3 pb-2 gap-2 custom-scrollbar">
               {(Object.keys(tabLabels) as Array<keyof CodingSchemaBranch>).map(tab => (
                 <button
                   key={tab}
