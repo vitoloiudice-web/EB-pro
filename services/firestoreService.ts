@@ -120,7 +120,11 @@ class FirestoreService {
         data: paginatedItems,
         total: items.length
       };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for items.');
+        return { data: [], total: 0 };
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
     }
@@ -185,7 +189,11 @@ class FirestoreService {
       const start = (page - 1) * pageSize;
       const paginatedData = data.slice(start, start + pageSize);
       return { data: paginatedData, total: data.length };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for suppliers.');
+        return { data: [], total: 0 };
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
     }
@@ -240,7 +248,11 @@ class FirestoreService {
         data = data.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
       }
       return { data, total: data.length };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for customers.');
+        return { data: [], total: 0 };
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
     }
@@ -303,7 +315,11 @@ class FirestoreService {
       const q = query(collection(db, 'clients', client.id, 'qualificationCriteria'));
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for qualification criteria.');
+        return [];
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
     }
@@ -441,7 +457,11 @@ class FirestoreService {
         data = data.filter((o: any) => o.po_number?.toLowerCase().includes(search.toLowerCase()));
       }
       return { data, total: data.length };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for orders.');
+        return { data: [], total: 0 };
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
     }
@@ -481,7 +501,11 @@ class FirestoreService {
       const snapshot = await getDocs(q);
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       return { data, total: data.length };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        console.warn('Firestore client is offline. Returning empty data for logistics events.');
+        return { data: [], total: 0 };
+      }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
     }

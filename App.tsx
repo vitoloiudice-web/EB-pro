@@ -83,8 +83,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
+const PROD_WORKSPACE: Client = { id: 'centrale-acquisti', name: 'Centrale Acquisti', spreadsheetId: 'default' };
+const SANDBOX_WORKSPACE: Client = { id: 'sandbox-test', name: 'Sandbox (Test)', spreadsheetId: 'default' };
+
 function App() {
-  const adminWorkspace: Client = { id: 'centrale-acquisti', name: 'Centrale Acquisti', spreadsheetId: 'default' };
+  const [activeWorkspace, setActiveWorkspace] = useState<Client>(PROD_WORKSPACE);
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -159,25 +162,25 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case ViewState.DASHBOARD:
-        return <Dashboard clients={[adminWorkspace]} onNavigate={navigateTo} />;
+        return <Dashboard clients={[activeWorkspace]} onNavigate={navigateTo} />;
       case ViewState.MRP:
-        return <MRPView client={adminWorkspace} />;
+        return <MRPView client={activeWorkspace} />;
       case ViewState.LOGISTICS:
-        return <LogisticsView client={adminWorkspace} initialFilter={viewParams?.filter} />;
+        return <LogisticsView client={activeWorkspace} initialFilter={viewParams?.filter} />;
       case ViewState.BI:
-        return <BusinessIntelligenceView client={adminWorkspace} />;
+        return <BusinessIntelligenceView client={activeWorkspace} />;
       case ViewState.SUPPLIER_QUALIFICATION:
-        return <SupplierQualificationView client={adminWorkspace} />;
+        return <SupplierQualificationView client={activeWorkspace} />;
       case ViewState.SUPPLIER_SCOUTING:
-        return <SupplierScoutingView client={adminWorkspace} />;
+        return <SupplierScoutingView client={activeWorkspace} />;
       case ViewState.MASTER_DATA:
         return <MasterDataView 
-          client={adminWorkspace} 
+          client={activeWorkspace} 
           initialTab={viewParams?.tab} 
           initialSubTab={viewParams?.subTab} 
         />;
       case ViewState.SETTINGS:
-        return <AdminProfileView client={adminWorkspace} />;
+        return <AdminProfileView client={activeWorkspace} />;
       default:
         return <div className="p-10 text-center text-slate-500">Modulo in costruzione</div>;
     }
@@ -380,6 +383,14 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative w-full">
         
+        {/* Sandbox Indicator */}
+        {activeWorkspace.id === 'sandbox-test' && (
+          <div className="bg-amber-500 text-white text-center text-xs font-bold py-1.5 px-4 flex-shrink-0 flex items-center justify-center gap-2 shadow-sm z-50">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.268 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            MODALITÀ SANDBOX ATTIVA - I dati inseriti qui sono fittizi e non intaccano l'ambiente di produzione
+          </div>
+        )}
+
         {/* Header - Neomorphic style */}
         <header className="h-16 sm:h-20 flex items-center justify-between px-4 sm:px-8 z-20 flex-shrink-0 neu-flat rounded-bl-[2rem] !border-none">
           <div className="flex items-center">
@@ -427,6 +438,15 @@ function App() {
           <div className="flex items-center space-x-2 sm:space-x-6">
             
             <div className="flex items-center space-x-2 sm:space-x-4">
+               {/* Workspace Toggle */}
+               <button
+                 onClick={() => setActiveWorkspace(w => w.id === 'centrale-acquisti' ? SANDBOX_WORKSPACE : PROD_WORKSPACE)}
+                 className={`hidden md:flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${activeWorkspace.id === 'sandbox-test' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
+                 title="Cambia Ambiente"
+               >
+                 {activeWorkspace.id === 'sandbox-test' ? 'Esci da Sandbox' : 'Entra in Sandbox'}
+               </button>
+
                {/* Font Toggle */}
               <button 
                 onClick={cycleFontSize} 

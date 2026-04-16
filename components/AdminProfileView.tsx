@@ -53,9 +53,41 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
           setProfile(emptyProfile);
           setFormData(emptyProfile);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to fetch admin profile", error);
-        setError("Impossibile caricare il profilo. Riprova più tardi.");
+        
+        // Handle offline error gracefully by initializing an empty profile
+        let isOfflineError = false;
+        try {
+          const errInfo = JSON.parse(error.message);
+          if (errInfo.error && errInfo.error.includes('client is offline')) isOfflineError = true;
+        } catch {
+          if (error.message && error.message.includes('client is offline')) isOfflineError = true;
+        }
+
+        if (isOfflineError) {
+          const emptyProfile: AdminProfile = {
+            companyName: client.name || '',
+            vatNumber: '',
+            taxId: '',
+            email: '',
+            phone: '',
+            website: '',
+            address: '',
+            zipCode: '',
+            city: '',
+            province: '',
+            country: 'Italia',
+            bankName: '',
+            iban: '',
+            swift: '',
+            logoUrl: ''
+          };
+          setProfile(emptyProfile);
+          setFormData(emptyProfile);
+        } else {
+          setError("Impossibile caricare il profilo. Riprova più tardi.");
+        }
       } finally {
         setLoading(false);
       }
@@ -196,7 +228,35 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
           <h2 className="text-2xl font-bold text-slate-700">Impostazioni Centrale Acquisti</h2>
           <p className="text-sm text-slate-500 font-medium">Configurazione dati legali e fiscali dell'amministratore</p>
         </div>
-        <div>
+        <div className="flex items-center space-x-4">
+          {client.id === 'sandbox-test' && (
+            <button 
+              onClick={async () => {
+                if (window.confirm("Sei sicuro di voler sincronizzare la Sandbox con i dati di Produzione? I dati attuali della Sandbox verranno sovrascritti.")) {
+                  setLoading(true);
+                  try {
+                    const { seedingService } = await import('../services/seedingService');
+                    const prodClient = { id: 'centrale-acquisti', name: 'Centrale Acquisti', spreadsheetId: 'default' };
+                    await seedingService.syncFromProduction(client, prodClient);
+                    setSuccess("Sandbox sincronizzata con successo!");
+                    setTimeout(() => {
+                      setSuccess(null);
+                      window.location.reload(); // Reload to fetch new data
+                    }, 2000);
+                  } catch (err: any) {
+                    setError(`Errore durante la sincronizzazione: ${err.message}`);
+                    setTimeout(() => setError(null), 5000);
+                  } finally {
+                    setLoading(false);
+                  }
+                }
+              }}
+              className="neu-btn px-6 py-2 text-amber-600 border border-amber-200 bg-amber-50 hover:bg-amber-100"
+            >
+              <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Sincronizza da Produzione
+            </button>
+          )}
           {isEditing ? (
             <div className="flex space-x-4">
               <button onClick={handleCancel} className="neu-btn px-6 py-2 text-slate-600">
@@ -208,7 +268,7 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
             </div>
           ) : (
             <button onClick={() => setIsEditing(true)} className="neu-btn px-6 py-2 text-slate-600">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               Modifica
             </button>
           )}

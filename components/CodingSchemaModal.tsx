@@ -137,9 +137,18 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
         console.error("Failed to fetch schema", err);
         try {
           const errInfo = JSON.parse(err.message);
-          setError(`Errore: ${errInfo.error} (Op: ${errInfo.operationType}, Path: ${errInfo.path})`);
+          if (errInfo.error && errInfo.error.includes('client is offline')) {
+            // If offline and not in cache, fallback to default gracefully
+            setSchema(defaultSchema);
+          } else {
+            setError(`Errore: ${errInfo.error} (Op: ${errInfo.operationType}, Path: ${errInfo.path})`);
+          }
         } catch {
-          setError("Errore nel caricamento dello schema: " + err.message);
+          if (err.message && err.message.includes('client is offline')) {
+            setSchema(defaultSchema);
+          } else {
+            setError("Errore nel caricamento dello schema: " + err.message);
+          }
         }
       }).finally(() => {
         setLoading(false);
