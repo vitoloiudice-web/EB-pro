@@ -11,14 +11,14 @@ import { Client, Item, Supplier, Customer, PaginatedResponse } from '../types';
 const USE_FIRESTORE = true; // Set to true for migration
 
 class DataService {
-  public async getItems(client: Client, page: number, pageSize: number, search: string): Promise<PaginatedResponse<Item>> {
+  public async getItems(client: Client, page: number, pageSize: number, search: string, filters: any = {}): Promise<PaginatedResponse<Item>> {
     if (!client) return { data: [], total: 0 };
-    if (USE_FIRESTORE) return firestoreService.getItems(client, page, pageSize, search);
+    if (USE_FIRESTORE) return firestoreService.getItems(client, page, pageSize, search, filters);
     return googleSheetsService.getItems(client, page, pageSize, search);
   }
 
-  public async getItemsForClients(clients: Client[], page: number, pageSize: number, search: string): Promise<PaginatedResponse<Item>> {
-    if (USE_FIRESTORE) return firestoreService.getItemsForClients(clients.filter(c => !!c).map(c => c.id), page, pageSize, search);
+  public async getItemsForClients(clients: Client[], page: number, pageSize: number, search: string, filters: any = {}): Promise<PaginatedResponse<Item>> {
+    if (USE_FIRESTORE) return firestoreService.getItemsForClients(clients.filter(c => !!c).map(c => c.id), page, pageSize, search, filters);
     // Fallback for Google Sheets (not strictly required for now, but good practice)
     if (clients.length > 0 && clients[0]) {
       return googleSheetsService.getItems(clients[0], page, pageSize, search);
@@ -67,7 +67,7 @@ class DataService {
     if (USE_FIRESTORE) return firestoreService.deleteSupplier(supplierId);
   }
 
-  public async getCustomers(client: Client, page: number, pageSize: number, search: string): Promise<PaginatedResponse<Customer>> {
+  public async getCustomers(client: Client, page: number = 1, pageSize: number = 1000, search: string = ''): Promise<PaginatedResponse<Customer>> {
     if (!client) return { data: [], total: 0 };
     if (USE_FIRESTORE) return firestoreService.getCustomers(client, page, pageSize, search);
     return googleSheetsService.getCustomers(client, page, pageSize, search);

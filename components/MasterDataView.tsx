@@ -36,7 +36,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
   const [success, setSuccess] = useState<string | null>(null);
 
   // Define fetchers wrapped in useCallback to prevent infinite loops in hook
-  const fetchItems = useCallback((p: number, s: number, q: string) => client ? dataService.getItems(client, p, s, q) : Promise.resolve({ data: [], total: 0 }), [client]);
+  const fetchItems = useCallback((p: number, s: number, q: string, f?: any) => client ? dataService.getItems(client, p, s, q, f) : Promise.resolve({ data: [], total: 0 }), [client]);
   const fetchSuppliers = useCallback((p: number, s: number, q: string) => client ? dataService.getSuppliers(client, p, s, q) : Promise.resolve({ data: [], total: 0 }), [client]);
   const fetchCustomers = useCallback((p: number, s: number, q: string) => client ? dataService.getCustomers(client, p, s, q) : Promise.resolve({ data: [], total: 0 }), [client]);
 
@@ -48,7 +48,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
   }, [activeMainTab, activeSubTab, fetchSuppliers, fetchCustomers, fetchItems]);
 
   const { 
-    data, setData, loading, total, page, setPage, search, setSearch, pageSize, refresh 
+    data, setData, loading, total, page, setPage, search, setSearch, filters, setFilters, pageSize, refresh 
   } = usePaginatedData<Item | Supplier | Customer | Client>({
     fetchMethod: activeFetchMethod,
     pageSize: 15
@@ -397,9 +397,38 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         )}
       </div>
 
-      {/* Search (only if not in Codifica) */}
+      {/* Search and Filters (only if not in Codifica) */}
       {!(activeMainTab === 'ARTICOLI' && activeSubTab === 'CODIFICA') && (
-        <div className="flex justify-end">
+        <div className="flex flex-col sm:flex-row justify-end gap-3">
+          {activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS' && (
+            <>
+              <div className="relative w-full sm:w-48">
+                <select
+                  className="neu-input w-full px-3 py-2 text-sm text-slate-600 font-medium bg-transparent"
+                  value={filters.category || ''}
+                  onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                >
+                  <option value="">Tutte le Categorie</option>
+                  <option value="DIRETTO">DIRETTO (D)</option>
+                  <option value="INDIRETTO">INDIRETTO (I)</option>
+                </select>
+              </div>
+              <div className="relative w-full sm:w-48">
+                <select
+                  className="neu-input w-full px-3 py-2 text-sm text-slate-600 font-medium bg-transparent"
+                  value={filters.skuPrefix || ''}
+                  onChange={(e) => setFilters({ ...filters, skuPrefix: e.target.value })}
+                >
+                  <option value="">Tutti i Prefissi Org</option>
+                  <option value="MP">MP - Materie Prime</option>
+                  <option value="SL">SL - Semilavorati</option>
+                  <option value="PF">PF - Prodotti Finiti</option>
+                  <option value="MO">MO - Materiali di Consumo</option>
+                  <option value="CE">CE - Cespiti</option>
+                </select>
+              </div>
+            </>
+          )}
           <div className="relative w-full sm:w-72">
                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

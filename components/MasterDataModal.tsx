@@ -218,8 +218,6 @@ const EnterpriseItemForm: React.FC<{
 
     const generateSku = (currentItem: Item, schema: CodingSchema) => {
         const getCode = (list: CodingMapping[], name: string) => list.find(x => x.name === name)?.code || name || '';
-
-        const catCode = getCode(schema.categories, currentItem.category);
         
         const isDiretto = currentItem.category === 'DIRETTO';
         const branch = isDiretto ? schema.diretto : schema.indiretto;
@@ -231,14 +229,11 @@ const EnterpriseItemForm: React.FC<{
         const prog = currentItem.progressive || '001';
         const variant = getCode(safeBranch.variants, currentItem.variant) || currentItem.variant || 'A';
         const rev = getCode(safeBranch.revisions, currentItem.revision) || currentItem.revision || '0';
-        const orgCode = currentItem.skuPrefix || '';
 
-        // CRYSTALLIZED COMPOSITION: 1° Cat, 2° Group, 3° Org, 4° Macro, 5° Fam, 6° Prog, 7° Var, 8° Rev
+        // CRYSTALLIZED COMPOSITION: 1° Group, 2° Macro, 3° Fam, 4° Prog, 5° Var, 6° Rev
         // CRYSTALLIZED SEPARATOR: "."
         const parts = [
-            catCode,
             groupCode,
-            orgCode,
             macroFamCode,
             famCode,
             prog,
@@ -347,6 +342,17 @@ const EnterpriseItemForm: React.FC<{
                              </div>
                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <SelectGroup 
+                                    label="Categoria" 
+                                    value={item.category} 
+                                    onChange={(val) => handleFieldChange({category: val, group: '', macroFamily: '', family: '', variant: '', revision: ''})} 
+                                    options={currentSchema.categories.map(c => ({ label: `${c.code} - ${c.name}`, value: c.name }))}
+                                    tooltip={{
+                                        title: "Categoria e-Solver",
+                                        description: "Definisce il ramo di codifica (Diretto/Indiretto) e le logiche di ricalcolo.",
+                                        usage: "Seleziona D per componenti a bordo veicolo, I per sussidiari."
+                                    }}
+                                />
+                                <SelectGroup 
                                     label="Prefisso (Org)" 
                                     value={item.skuPrefix} 
                                     onChange={(val) => handleFieldChange({skuPrefix: val})} 
@@ -395,17 +401,6 @@ const EnterpriseItemForm: React.FC<{
                                     
                                     return (
                                         <>
-                                            <SelectGroup 
-                                                label="Categoria" 
-                                                value={item.category} 
-                                                onChange={(val) => handleFieldChange({category: val, group: '', macroFamily: '', family: '', variant: '', revision: ''})} 
-                                                options={currentSchema.categories.map(c => ({ label: `${c.code} - ${c.name}`, value: c.name }))}
-                                                tooltip={{
-                                                    title: "Categoria e-Solver",
-                                                    description: "Definisce il ramo di codifica (Diretto/Indiretto) e le logiche di ricalcolo.",
-                                                    usage: "Seleziona D per componenti a bordo veicolo, I per sussidiari."
-                                                }}
-                                            />
                                             <SelectGroup 
                                                 label="Gruppo" 
                                                 value={item.group} 

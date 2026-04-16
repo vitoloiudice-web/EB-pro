@@ -83,12 +83,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 class FirestoreService {
   // --- ITEMS ---
-  public async getItems(client: Client, page: number = 1, pageSize: number = 20, search: string = ''): Promise<PaginatedResponse<Item>> {
+  public async getItems(client: Client, page: number = 1, pageSize: number = 20, search: string = '', filters: any = {}): Promise<PaginatedResponse<Item>> {
     if (!client) return { data: [], total: 0 };
-    return this.getItemsForClients([client.id], page, pageSize, search);
+    return this.getItemsForClients([client.id], page, pageSize, search, filters);
   }
 
-  public async getItemsForClients(clientIds: string[], page: number = 1, pageSize: number = 20, search: string = ''): Promise<PaginatedResponse<Item>> {
+  public async getItemsForClients(clientIds: string[], page: number = 1, pageSize: number = 20, search: string = '', filters: any = {}): Promise<PaginatedResponse<Item>> {
     if (clientIds.length === 0) return { data: [], total: 0 };
     const path = 'items';
     try {
@@ -110,6 +110,13 @@ class FirestoreService {
           item.sku.toLowerCase().includes(search.toLowerCase()) || 
           item.name.toLowerCase().includes(search.toLowerCase())
         );
+      }
+
+      if (filters.category) {
+        items = items.filter(item => item.category === filters.category);
+      }
+      if (filters.skuPrefix) {
+        items = items.filter(item => item.skuPrefix === filters.skuPrefix);
       }
 
       // Handle pagination in memory
@@ -527,16 +534,18 @@ class FirestoreService {
   public async getBIData(client: Client) {
     if (!client) return null;
     try {
-      const [suppliersRes, itemsRes, ordersRes] = await Promise.all([
+      const [suppliersRes, itemsRes, ordersRes, customersRes] = await Promise.all([
         this.getSuppliers(client, 1, 1000),
         this.getItems(client, 1, 1000),
-        this.getOrders(client, 1, 1000)
+        this.getOrders(client, 1, 1000),
+        this.getCustomers(client, 1, 1000)
       ]);
 
       return {
         suppliers: suppliersRes.data,
         items: itemsRes.data,
-        orders: ordersRes.data
+        orders: ordersRes.data,
+        customers: customersRes.data
       };
     } catch (error) {
       console.error("Error fetching BI data:", error);
