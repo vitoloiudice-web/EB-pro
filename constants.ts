@@ -1,10 +1,9 @@
 
 import { Client, AdminProfile } from './types';
 
-// NOTE: In a real production app, these should be environment variables.
-// For the purpose of this architecture demo, we keep them here.
-export const GOOGLE_CLIENT_ID = "414620675878-om6fktpaf0a78h943mle3ek5dfbu4q03.apps.googleusercontent.com";
-export const GOOGLE_API_KEY = "AIzaSyDOtnn5HYInqBXGCdToLQZY2KKL2GnG-fo"; 
+// Environment variables
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+export const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || ""; 
 export const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
 // Added userinfo.email and userinfo.profile scopes
 export const SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";

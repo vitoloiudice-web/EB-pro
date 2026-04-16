@@ -2,8 +2,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Item, Supplier, AiAnalysisResult, ScoutingResult } from "../types";
 import { GOOGLE_API_KEY } from "../constants";
 
-// Use process.env.API_KEY if available, otherwise fallback to the constant for this demo environment.
-const API_KEY = process.env.API_KEY || GOOGLE_API_KEY;
+// Use VITE_GEMINI_API_KEY or fallback to GOOGLE_API_KEY
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || GOOGLE_API_KEY;
 
 // Note: Using a system instruction to set the persona
 const SYSTEM_INSTRUCTION = `Esperto procurement AI. Analisi dati inventario/fornitori. Trova risparmi, rischi, KPI. Risposte brevi, stile telegrafico.`;
