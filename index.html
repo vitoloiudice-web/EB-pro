@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>EB-pro | Approvvigionamento Enterprise</title>
     <link rel="icon" type="image/png" href="./eb_logo.png" />
-    <link rel="manifest" href="./manifest.json" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#EEF2F6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -128,17 +128,6 @@
   </head>
   <body>
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-          console.log('SW registered: ', registration);
-        }).catch(registrationError => {
-          console.log('SW registration failed: ', registrationError);
-        });
-      });
-    }
-  </script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
