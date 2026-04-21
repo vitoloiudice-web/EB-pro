@@ -10,6 +10,7 @@ import { CodingSchema } from '../types';
 import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 
@@ -125,6 +126,93 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         setError(`Errore eliminazione: ${error.message}`);
         setTimeout(() => setError(null), 5000);
     }
+  };
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportExcel = async () => {
+    try {
+      // Export only logical active items for current client
+      // We leverage the fetchItems hook, but passing large 'size' to grab all for simple export flow
+      const fullResponse = await fetchItems(1, 10000, search, filters);
+      const itemsToExport = fullResponse.data as Item[];
+      
+      const worksheetData = itemsToExport.map(item => ({
+        SKU: item.sku,
+        Descrizione: item.description,
+        Gruppo: item.group,
+        Categoria: item.category,
+        MacroFamiglia: item.macroFamily,
+        UnitaMisura: item.unit,
+        CostoUnitario: item.cost,
+        TempoConsegnaGG: item.leadTimeDays,
+        FornitoreID: item.supplierId
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(worksheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Articoli");
+      XLSX.writeFile(wb, `Export_Articoli_${client.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err: any) {
+      setError(`Errore Esportazione: ${err.message}`);
+    }
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const dataJson = XLSX.utils.sheet_to_json(ws);
+
+        let importedCount = 0;
+        
+        // Simple mass import logic.
+        for (const row of dataJson as any[]) {
+          const item: Item = {
+            id: `IMPORT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            sku: row.SKU || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            name: row.Descrizione || 'Senza Descrizione',
+            description: row.Descrizione || 'Senza Descrizione',
+            category: row.Categoria || '',
+            group: row.Gruppo || '',
+            macroFamily: row.MacroFamiglia || '',
+            family: row.Famiglia || '',
+            revision: '0',
+            variant: 'A',
+            progressive: '001',
+            unit: row.UnitaMisura || 'PZ',
+            weightKg: 0,
+            isPhantom: false,
+            isSubcontracting: false,
+            leadTimeOffset: 0,
+            cost: typeof row.CostoUnitario === 'number' ? row.CostoUnitario : parseFloat(row.CostoUnitario) || 0,
+            stock: 0,
+            safetyStock: 0,
+            leadTimeDays: typeof row.TempoConsegnaGG === 'number' ? row.TempoConsegnaGG : parseInt(row.TempoConsegnaGG) || 0,
+            supplierId: row.FornitoreID || ''
+          };
+          
+          await dataService.saveItem(client, item, true);
+          importedCount++;
+        }
+        
+        setSuccess(`Importazione completata: ${importedCount} articoli caricati.`);
+        setTimeout(() => setSuccess(null), 3000);
+        refresh(); // Reload paginated lists
+      } catch (err: any) {
+        setError(`Errore Importazione: ${err.message}`);
+      }
+      // reset file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleExportContractPDF = async (cust: Customer) => {
@@ -479,7 +567,36 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
         client={client}
       />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end space-x-3">
+        {activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS' && (
+          <div className="flex space-x-3 mr-4 border-r border-slate-300 pr-4">
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleImportExcel} 
+            />
+            <Tooltip position="bottom" content={{ title: "Importa Articoli", description: "Carica un file Excel per caricare o aggiornare massivamente gli articoli in anagrafica.", usage: "Clicca per selezionare il file dal tuo computer." }}>
+              <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="neu-btn px-4 py-2.5 text-slate-600 flex items-center gap-2"
+              >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Importa
+              </button>
+            </Tooltip>
+            <Tooltip position="bottom" content={{ title: "Esporta Articoli", description: "Scarica l'intera lista articoli in formato Excel per un uso esterno o backup.", usage: "Clicca per avviare il download." }}>
+              <button 
+                  onClick={handleExportExcel}
+                  className="neu-btn px-4 py-2.5 text-slate-600 flex items-center gap-2"
+              >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Esporta
+              </button>
+            </Tooltip>
+          </div>
+        )}
         {!(activeMainTab === 'ARTICOLI' && activeSubTab === 'CODIFICA') && (
           <Tooltip position="bottom" content={{ title: "Crea Nuovo Record", description: "Avvia la creazione di un nuovo articolo, fornitore o cliente.", usage: "Clicca per aprire il modulo di inserimento." }}>
             <button 

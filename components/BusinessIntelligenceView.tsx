@@ -22,10 +22,11 @@ interface BIProps {
 const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
   const [reportType, setReportType] = useState<'PERFORMANCE' | 'QUALITY' | 'FEE_REVENUE' | 'COMMERCIAL' | 'TREND' | 'GOVERNANCE'>('PERFORMANCE');
   const [savingsChartMode, setSavingsChartMode] = useState<'LINE' | 'BAR'>('LINE');
-  const [trendTimeframe, setTrendTimeframe] = useState<'1M' | '3M' | '6M' | '1Y'>('1M');
+  const [trendTimeframe, setTrendTimeframe] = useState<'1Y' | '3Y' | '5Y' | 'ALL'>('ALL');
   const [generating, setGenerating] = useState(false);
 
   // --- DATA ---
+  const [allOrders, setAllOrders] = useState<any[]>([]);
   const [supplierPerformanceData, setSupplierPerformanceData] = useState<any[]>([]);
   const [savingsData, setSavingsData] = useState<any[]>([]);
   const [qualityMatrix, setQualityMatrix] = useState<any[]>([]);
@@ -53,6 +54,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         if (!biData) return;
 
         const { suppliers, items, orders, customers = [] } = biData;
+        setAllOrders(orders);
 
         // 0. Active Customers
         const today = new Date();
@@ -132,24 +134,6 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         setDefectTypesData([]);
         setNcTrendData([]);
 
-        // 7. Trend Data (Intermediated Spend)
-        const intermediatedTrend = months.slice(0, currentMonth + 1).map((m, i) => {
-          const monthlyOrders = orders.filter(o => getOrderDate(o).getMonth() === i);
-          const val = monthlyOrders.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-          
-          const prevMonthlyOrders = i > 0 ? orders.filter(o => getOrderDate(o).getMonth() === i - 1) : [];
-          const prevVal = prevMonthlyOrders.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-          const growth = prevVal > 0 ? ((val - prevVal) / prevVal) * 100 : 0;
-          
-          return {
-            name: m,
-            value: val,
-            growth: parseFloat(growth.toFixed(1)),
-            cagr: 0 // Requires year over year data, setting to 0 for single year
-          };
-        });
-        setTrendData(intermediatedTrend.some(t => t.value > 0) ? intermediatedTrend : []);
-
         // 8. Commercial Savings (REAL data derived from items & orders)
         const categoriesMap = new Map<string, { estimated: number, actual: number }>();
 
@@ -222,6 +206,77 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
     };
     fetchData();
   }, [client]);
+
+  // Handle Multi-Year Trend Calculation
+  useEffect(() => {
+    if (!allOrders || allOrders.length === 0) {
+      setTrendData([]);
+      return;
+    }
+
+    const now = new Date();
+    let cutoffDate = new Date(0); // ALL time
+    if (trendTimeframe === '1Y') cutoffDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    else if (trendTimeframe === '3Y') cutoffDate = new Date(now.getFullYear() - 3, now.getMonth(), now.getDate());
+    else if (trendTimeframe === '5Y') cutoffDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+
+    const getOrderDate = (o: any) => o.created_at?.seconds ? new Date(o.created_at.seconds * 1000) : new Date(o.date || Date.now());
+
+    const filteredOrders = allOrders.filter(o => getOrderDate(o) >= cutoffDate);
+    
+    // Group logic: By month for 1Y/3Y, by Year for 5Y/ALL
+    const groupByYear = trendTimeframe === '5Y' || trendTimeframe === 'ALL';
+    const buckets: Record<string, number> = {};
+    
+    filteredOrders.forEach(o => {
+       const d = getOrderDate(o);
+       const key = groupByYear 
+         ? `${d.getFullYear()}` 
+         : `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+       buckets[key] = (buckets[key] || 0) + (o.totalAmount || 0);
+    });
+
+    // Make sure we sort properly. For MM/YYYY we need custom sorting, so let's parse back to sort
+    const sortedKeys = Object.keys(buckets).sort((a, b) => {
+      if (groupByYear) {
+         return parseInt(a) - parseInt(b);
+      } else {
+         const [mA, yA] = a.split('/');
+         const [mB, yB] = b.split('/');
+         const dateA = new Date(parseInt(yA), parseInt(mA) - 1, 1);
+         const dateB = new Date(parseInt(yB), parseInt(mB) - 1, 1);
+         return dateA.getTime() - dateB.getTime();
+      }
+    });
+
+    const trendProcessed = sortedKeys.map((key, i) => {
+       const val = buckets[key];
+       let growth = 0;
+       if (i > 0) {
+          const prevVal = buckets[sortedKeys[i-1]];
+          if (prevVal > 0) growth = ((val - prevVal) / prevVal) * 100;
+       }
+       // Absolute Compound Annual Growth Rate (CAGR) relative to the first period tracked
+       let cagr = 0;
+       if (i > 0 && buckets[sortedKeys[0]] > 0) {
+          // If grouped by year, periods = i. If grouped by Month, periods = i / 12
+          const periods = groupByYear ? i : (i / 12);
+          if (periods > 0) {
+             const cagrVal = (Math.pow(val / buckets[sortedKeys[0]], 1 / periods) - 1) * 100;
+             cagr = isNaN(cagrVal) || !isFinite(cagrVal) ? 0 : cagrVal;
+          }
+       }
+       
+       return {
+         name: key,
+         value: parseFloat(val.toFixed(2)),
+         growth: parseFloat(growth.toFixed(1)),
+         cagr: parseFloat(cagr.toFixed(1))
+       };
+    });
+    
+    setTrendData(trendProcessed);
+  }, [allOrders, trendTimeframe]);
 
   const handleGenerateReport = async (format: 'PDF' | 'EXCEL') => {
     setGenerating(true);
@@ -995,7 +1050,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
                           <p className="text-xs text-slate-500">Volume di acquisto gestito per conto dei clienti</p>
                       </div>
                       <div className="flex space-x-2 bg-[#EEF2F6] p-1 rounded-xl shadow-inner">
-                          {(['1M', '3M', '6M', '1Y'] as const).map(tf => (
+                          {(['1Y', '3Y', '5Y', 'ALL'] as const).map(tf => (
                               <button
                                   key={tf}
                                   onClick={() => setTrendTimeframe(tf)}

@@ -75,8 +75,9 @@ async function setupServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // Express 5.x requires '*all' or wildcard routing pattern
-    app.get('*all', (req, res) => {
+    
+    // Catch-all to serve index.html for client-side routing
+    app.use((req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

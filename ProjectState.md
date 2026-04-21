@@ -24,6 +24,12 @@
 - **AdminProfileView**: Centralized legal, contact, and bank identity management for the procurement center.
 - **MasterDataView**: Robust CRUD for Items (with taxonomic coding), Suppliers, and Customers.
 
+## Recent Changes (Sprint 16)
+- **PWA Mobile Hotfix**: 
+  - Express 5.x catch-all routing fallback fixed via `app.use` instead of `app.get('*all')`.
+  - Manifest `start_url` forced to absolute `/` root.
+  - HTML DOM injected with `<base href="/" />` to prevent relative chunk path leaks on Mobile install.
+
 ## Recent Changes (Sprint 15)
 - **Document Numbering API**: Implemented abstract layer in `documentService` supporting persistent numeric progression natively attached to Firestore Transaction counters.
 - **Persistent PDF Backups**: Auto-archival of `.pdf` byte-codes within Firestore via specific `generated_documents` audits registry.

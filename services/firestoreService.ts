@@ -453,11 +453,21 @@ class FirestoreService {
   }
 
   // --- ORDERS ---
-  public async getOrders(client: Client, page: number = 1, pageSize: number = 20, search: string = '') {
+  public async getOrders(client: Client, page: number = 1, pageSize: number = 20, search: string = '', startDate?: Date, endDate?: Date) {
     if (!client) return { data: [], total: 0 };
     const path = 'purchase_orders';
     try {
-      const q = query(collection(db, path), where('client_id', '==', client.id), limit(pageSize));
+      let qConstraints: any[] = [where('client_id', '==', client.id)];
+      
+      // OPTIMIZATION: Composite index required for complex BI queries 
+      // (client_id: ASC, created_at: DESC)
+      if (startDate) qConstraints.push(where('created_at', '>=', startDate));
+      if (endDate) qConstraints.push(where('created_at', '<=', endDate));
+      
+      qConstraints.push(orderBy('created_at', 'desc'));
+      qConstraints.push(limit(pageSize));
+
+      const q = query(collection(db, path), ...qConstraints);
       const snapshot = await getDocs(q);
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       if (search) {
@@ -468,6 +478,13 @@ class FirestoreService {
       if (error.message && error.message.includes('client is offline')) {
         console.warn('Firestore client is offline. Returning empty data for orders.');
         return { data: [], total: 0 };
+      }
+      if (error.message && error.message.includes('requires an index')) {
+         console.warn('Composite Index missing. A fallback to non-indexed query should occur in production or create the index.');
+         // Temporary fallback for Sandbox avoiding index crash
+         const fallbackQ = query(collection(db, path), where('client_id', '==', client.id), limit(pageSize));
+         const snap = await getDocs(fallbackQ);
+         return { data: snap.docs.map(d => ({ id: d.id, ...d.data() })), total: snap.docs.length };
       }
       handleFirestoreError(error, OperationType.LIST, path);
       return { data: [], total: 0 };
