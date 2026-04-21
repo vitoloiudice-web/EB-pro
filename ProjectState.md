@@ -42,6 +42,10 @@
   - Refined `scoutSuppliers` to correctly handle grounding metadata and sources.
   - Implemented AI Analysis Caching in Firestore and background updates for Dashboard.
   - Optimized AI prompts using "caveman" style for faster response times.
+- **Budget Persistence**:
+  - Implemented `budget_allocations` collection in Firestore.
+  - Replaced mock budget logic in `BudgetManagerModal` and `Dashboard` with real persistence.
+  - Added smart fallback logic (Spend + 20%) for non-allocated categories.
 - **UI/UX**:
   - Improved layout and overflow handling in `SupplierScoutingView`.
   - Added conditional rendering and loading states for better resilience.

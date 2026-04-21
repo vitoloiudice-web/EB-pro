@@ -137,6 +137,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /budget_allocations/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /bom_lines/{id} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();

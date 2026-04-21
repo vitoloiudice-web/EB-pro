@@ -64,88 +64,99 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onNavigate }) => {
     } catch (err) {
       console.error("AI Analysis failed:", err);
     } finally {
+      setAiLoading(true); // Temporary flip to force re-render if needed, though usually just false
       setAiLoading(false);
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (clients.length === 0) {
-        setLoading(false);
-        setAiLoading(false);
-        setTotalValue(0);
-        setCategoryData([]);
-        setTrendData([]);
-        setOrderStats({ shipped: 0, exception: 0 });
-        return;
-      }
-      
-      setLoading(true);
-      
-      try {
-        // Fetch larger dataset for dashboard analytics to avoid pagination skewing totals
-        const itemsRes = await dataService.getItemsForClients(clients, 1, 1000, '');
-        const suppliersRes = await dataService.getSuppliersForClients(clients, 1, 1000, '');
+  const fetchData = async () => {
+    if (clients.length === 0) {
+      setLoading(false);
+      setAiLoading(false);
+      setTotalValue(0);
+      setCategoryData([]);
+      setTrendData([]);
+      setOrderStats({ shipped: 0, exception: 0 });
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Fetch larger dataset for dashboard analytics to avoid pagination skewing totals
+      const [itemsRes, suppliersRes, budgetRes] = await Promise.all([
+        dataService.getItemsForClients(clients, 1, 1000, ''),
+        dataService.getSuppliersForClients(clients, 1, 1000, ''),
+        dataService.getBudgetAllocations(clients[0], 'APPROVED')
+      ]);
 
-        const currentItems = itemsRes.data;
-        const currentSuppliers = suppliersRes.data;
-        setItems(currentItems);
-        setSuppliers(currentSuppliers);
-        
-        // Process real data (or empty if none)
-        const categorySpend: Record<string, number> = {};
-        let total = 0;
-        currentItems.forEach(item => {
-          const val = item.stock * item.cost;
-          categorySpend[item.category] = (categorySpend[item.category] || 0) + val;
-          total += val;
-        });
-        setTotalValue(total);
+      const currentItems = itemsRes.data;
+      const currentSuppliers = suppliersRes.data;
+      const budgetAllocations = budgetRes;
 
-        const chart = Object.keys(categorySpend).map((key, index) => ({ 
+      setItems(currentItems);
+      setSuppliers(currentSuppliers);
+      
+      // Process real data (or empty if none)
+      const categorySpend: Record<string, number> = {};
+      let total = 0;
+      currentItems.forEach(item => {
+        const val = item.stock * item.cost;
+        categorySpend[item.category] = (categorySpend[item.category] || 0) + val;
+        total += val;
+      });
+      setTotalValue(total);
+
+      const chart = Object.keys(categorySpend).map((key, index) => {
+        const allocation = budgetAllocations.find((b: any) => b.category_name === key);
+        const budgetAmount = allocation ? allocation.budget_amount : categorySpend[key] * 1.2;
+
+        return { 
           name: key, 
           value: categorySpend[key],
-          budget: categorySpend[key] * 1.2,
+          budget: budgetAmount,
           spent: categorySpend[key],
           color: ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'][index % 6]
-        }));
-        setCategoryData(chart);
+        };
+      });
+      setCategoryData(chart);
 
-        // Initialize trend data with zeros for existing categories
-        const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-        const actualCategories = Array.from(new Set(currentItems.map(i => i.category)));
-        
-        const emptyTrend = months.map(m => {
-            const monthObj: any = { name: m, Totale: 0 };
-            actualCategories.forEach(cat => {
-                monthObj[cat] = 0;
-            });
-            return monthObj;
-        });
-        
-        setTrendData(emptyTrend);
+      // Initialize trend data with zeros for existing categories
+      const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+      const actualCategories = Array.from(new Set(currentItems.map(i => i.category)));
+      
+      const emptyTrend = months.map(m => {
+          const monthObj: any = { name: m, Totale: 0 };
+          actualCategories.forEach(cat => {
+              monthObj[cat] = 0;
+          });
+          return monthObj;
+      });
+      
+      setTrendData(emptyTrend);
 
-        // Fetch Order Stats
-        if (clients.length > 0) {
-            const logisticsStats = await dataService.getLogisticsStats(clients[0]);
-            setOrderStats({
-                shipped: logisticsStats.openOrders, // Simplified mapping
-                exception: logisticsStats.delayed
-            });
-        }
-
-        // Data is ready, stop main loading
-        setLoading(false);
-
-        // Load AI (cached or background)
-        runAiAnalysis(currentItems, currentSuppliers);
-
-      } catch (err) {
-        console.error(err);
-        setLoading(false);
+      // Fetch Order Stats
+      if (clients.length > 0) {
+          const logisticsStats = await dataService.getLogisticsStats(clients[0]);
+          setOrderStats({
+              shipped: logisticsStats.openOrders, // Simplified mapping
+              exception: logisticsStats.delayed
+          });
       }
-    };
 
+      // Data is ready, stop main loading
+      setLoading(false);
+
+      // Load AI (cached or background)
+      runAiAnalysis(currentItems, currentSuppliers);
+
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [clients]);
 
@@ -220,7 +231,9 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onNavigate }) => {
       <BudgetManagerModal 
          isOpen={isBudgetModalOpen} 
          onClose={() => setBudgetModalOpen(false)} 
+         client={clients[0]}
          categories={categoryData}
+         onSave={fetchData}
       />
       <PurchaseOrderModal 
         isOpen={isOrderModalOpen}

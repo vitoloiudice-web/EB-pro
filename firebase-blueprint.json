@@ -17,6 +17,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
         "logo_url": { "type": "string", "format": "uri" },
         "created_at": { "type": "string", "format": "date-time" }
       },
@@ -137,6 +138,19 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["client_id", "name", "level"]
+    },
+    "budget_allocations": {
+      "title": "Budget Allocation",
+      "description": "Planned budget for item categories",
+      "type": "object",
+      "properties": {
+        "client_id": { "type": "string" },
+        "category_name": { "type": "string" },
+        "budget_amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["APPROVED", "PENDING"] },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["client_id", "category_name", "budget_amount"]
     }
   },
   "firestore": {
@@ -147,6 +161,7 @@
     "customers": { "schema": "customers", "description": "Client customers" },
     "purchase_orders": { "schema": "purchase_orders", "description": "Client purchase orders" },
     "logistics_events": { "schema": "logistics_events", "description": "Client logistics events" },
-    "classification_hierarchy": { "schema": "classification_hierarchy", "description": "Item classification levels" }
+    "classification_hierarchy": { "schema": "classification_hierarchy", "description": "Item classification levels" },
+    "budget_allocations": { "schema": "budget_allocations", "description": "Planned budgets per category" }
   }
 }

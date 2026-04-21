@@ -575,6 +575,45 @@ class FirestoreService {
       console.error("Error saving AI cache:", error);
     }
   }
+
+  // --- BUDGET ALLOCATIONS ---
+  public async getBudgetAllocations(client: Client, status?: 'APPROVED' | 'PENDING'): Promise<any[]> {
+    if (!client) return [];
+    const path = 'budget_allocations';
+    try {
+      let q = query(collection(db, path), where('client_id', '==', client.id));
+      if (status) {
+        q = query(q, where('status', '==', status));
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error("Error fetching budget allocations:", error);
+      return [];
+    }
+  }
+
+  public async saveBudgetAllocations(client: Client, allocations: any[], status: 'APPROVED' | 'PENDING' = 'APPROVED') {
+    if (!client) return;
+    const path = 'budget_allocations';
+    try {
+      const batch: any[] = [];
+      for (const allocation of allocations) {
+        const id = `${client.id}_${allocation.category_name}`;
+        const docRef = doc(db, path, id);
+        batch.push(setDoc(docRef, {
+          client_id: client.id,
+          category_name: allocation.category_name,
+          budget_amount: allocation.budget_amount,
+          status: status,
+          updated_at: serverTimestamp()
+        }, { merge: true }));
+      }
+      await Promise.all(batch);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  }
 }
 
 export const firestoreService = new FirestoreService();

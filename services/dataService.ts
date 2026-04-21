@@ -150,6 +150,15 @@ class DataService {
   public async saveAiAnalysisToCache(clientId: string, analysis: any) {
     if (USE_FIRESTORE) return firestoreService.saveAiAnalysisToCache(clientId, analysis);
   }
+
+  public async getBudgetAllocations(client: Client, status?: 'APPROVED' | 'PENDING') {
+    if (USE_FIRESTORE) return firestoreService.getBudgetAllocations(client, status);
+    return [];
+  }
+
+  public async saveBudgetAllocations(client: Client, allocations: any[], status: 'APPROVED' | 'PENDING' = 'APPROVED') {
+    if (USE_FIRESTORE) return firestoreService.saveBudgetAllocations(client, allocations, status);
+  }
 }
 
 export const dataService = new DataService();

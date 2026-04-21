@@ -18,6 +18,7 @@ export enum ViewState {
 export interface Client {
   id: string;
   name: string;
+  email?: string;
   logoUrl?: string;
   created_at?: string;
   spreadsheetId?: string;
