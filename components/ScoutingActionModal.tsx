@@ -107,7 +107,7 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
     const nextY = applyStandardSignature(doc, y + 20, adminProfile);
 
     // Standard Page Footer (ISO + Pagination)
-    applyPageFooter(doc, `MOD-SCT-${activeTab}-01`);
+    applyPageFooter(doc, `MOD-SCT-${activeTab}-01`, adminProfile);
 
     doc.save(`${activeTab}_${candidateName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };

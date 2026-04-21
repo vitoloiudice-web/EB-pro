@@ -87,7 +87,7 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     applyStandardSignature(doc, finalY, adminProfile);
     
     // Standard Page Footer (ISO + Pagination)
-    applyPageFooter(doc, "MOD-BDG-01 REV. 02");
+    applyPageFooter(doc, "MOD-BDG-01 REV. 02", adminProfile);
     
     return doc;
   };

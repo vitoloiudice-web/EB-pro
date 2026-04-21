@@ -166,7 +166,7 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
     doc.text(splitText, margin, startY + 15);
 
     applyStandardSignature(doc, startY + 110, adminProfile, "Firma per Accettazione Cliente");
-    applyPageFooter(doc, "MOD-CTR-01 REV. 00");
+    applyPageFooter(doc, "MOD-CTR-01 REV. 00", adminProfile);
 
     doc.save(`Contratto_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
@@ -209,7 +209,7 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
     doc.text(`TOTALE A PAGARE: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'}`, doc.internal.pageSize.width - margin - 60, finalY + 15);
 
     applyStandardSignature(doc, finalY + 40, adminProfile);
-    applyPageFooter(doc, "MOD-FAT-01 REV. 00");
+    applyPageFooter(doc, "MOD-FAT-01 REV. 00", adminProfile);
 
     doc.save(`Fattura_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };

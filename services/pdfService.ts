@@ -6,8 +6,9 @@ import { Client, AdminProfile } from '../types';
  */
 export const PDF_CONFIG = {
   margin: 20,
-  primaryColor: [59, 130, 246] as [number, number, number], // Blue
+  primaryColor: [0, 46, 93] as [number, number, number], // Pantone 648 C (#002E5D)
   secondaryColor: [100, 100, 100] as [number, number, number], // Gray
+  accentColorRed: [214, 0, 28] as [number, number, number], // Pantone 2035 C (#D6001C)
   textColor: [50, 50, 50] as [number, number, number], // Dark Gray
 };
 
@@ -49,13 +50,14 @@ export const applyStandardHeader = (
   const titleY = logoY + logoHeight + 12; // Spacing after logo
   doc.setFont(doc.getFont().fontName, 'bold');
   doc.setFontSize(22);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Pantone 648 C
   const titleText = title.toUpperCase();
   const titleWidth = doc.getTextWidth(titleText);
   const titleX = pageWidth - margin - titleWidth;
   doc.text(titleText, titleX, titleY);
 
   // 3. Underline - Thin line below title (0.1 mm as requested)
+  // Use Blue for the underline too to match title
   doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.setLineWidth(0.1);
   doc.line(titleX, titleY + 2, pageWidth - margin, titleY + 2);
@@ -75,7 +77,7 @@ export const applyStandardHeader = (
   doc.text(recipientText, pageWidth - margin - doc.getTextWidth(recipientText), infoY + 12);
 
   // Reset colors
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setTextColor(50, 50, 50);
   
   return infoY + 30; // Suggested Y position for content (Body starts here)
 };
@@ -120,12 +122,14 @@ export const applyStandardSignature = (
  * MUST be called AFTER all content is generated to handle total page count correctly.
  * @param doc The jsPDF instance
  * @param isoRevision The revision index (e.g., 'DOC-QR-01')
+ * @param adminProfile The admin profile to check for settings
  */
 export const applyPageFooter = (
   doc: jsPDF,
-  isoRevision: string = "SGQ REV. 00"
+  isoRevision: string = "SGQ REV. 00",
+  adminProfile: AdminProfile | null = null
 ) => {
-  const { margin, secondaryColor } = PDF_CONFIG;
+  const { margin, accentColorRed } = PDF_CONFIG;
   const pageCount = (doc as any).internal.getNumberOfPages();
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -133,19 +137,22 @@ export const applyPageFooter = (
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     
-    // Separation Line (0.05 mm)
-    doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    // 1. Separation Line (0.05 mm) - RED Pantone 2035 C
+    doc.setDrawColor(accentColorRed[0], accentColorRed[1], accentColorRed[2]);
     doc.setLineWidth(0.05);
     doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
 
+    // 2. Footer Text - RED Pantone 2035 C
     doc.setFontSize(8);
-    doc.setTextColor(secondaryColor[0]);
+    doc.setTextColor(accentColorRed[0], accentColorRed[1], accentColorRed[2]);
     doc.setFont(doc.getFont().fontName, 'normal');
 
-    // Left: UNI-ISO SGQ Citation
-    doc.text(`Sistema Gestione Qualità UNI-ISO 9001 | ${isoRevision}`, margin, pageHeight - 10);
+    // Left: UNI-ISO SGQ Citation (Only if enabled in settings, default true)
+    if (adminProfile?.printIsoCitation !== false) {
+      doc.text(`Sistema Gestione Qualità UNI-ISO 9001 | ${isoRevision}`, margin, pageHeight - 10);
+    }
 
-    // Right: Page X / Y
+    // Right: Page X / Y (Always visible)
     const pageText = `${i} / ${pageCount}`;
     doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), pageHeight - 10);
   }

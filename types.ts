@@ -25,6 +25,7 @@ export interface Client {
 }
 
 export interface AdminProfile {
+  printIsoCitation?: boolean; // Se stampare la citazione UNI-ISO nei PDF
   companyName: string;
   vatNumber: string; // Partita IVA
   taxId: string; // Codice Fiscale

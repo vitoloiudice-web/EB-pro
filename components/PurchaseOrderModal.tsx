@@ -124,7 +124,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
     applyStandardSignature(doc, finalY + 40, adminProfile);
 
     // Standard Page Footer (ISO + Pagination)
-    applyPageFooter(doc, "MOD-ORD-01 REV. 01");
+    applyPageFooter(doc, "MOD-ORD-01 REV. 01", adminProfile);
 
     doc.save(`Ordine_${formData.id || 'Draft'}_${formData.supplierName?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };

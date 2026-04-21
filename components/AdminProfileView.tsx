@@ -57,6 +57,7 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
         } else {
           // Initialize empty profile if none exists
           const emptyProfile: AdminProfile = {
+            printIsoCitation: true,
             companyName: client.name || '',
             vatNumber: '',
             taxId: '',
@@ -90,6 +91,7 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
 
         if (isOfflineError) {
           const emptyProfile: AdminProfile = {
+            printIsoCitation: true,
             companyName: client.name || '',
             vatNumber: '',
             taxId: '',
@@ -374,6 +376,33 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
             <InputField label="Banca" name="bankName" value={formData.bankName} onChange={handleChange} disabled={!isEditing} />
             <InputField label="IBAN" name="iban" value={formData.iban} onChange={handleChange} disabled={!isEditing} />
             <InputField label="SWIFT / BIC" name="swift" value={formData.swift} onChange={handleChange} disabled={!isEditing} />
+          </div>
+        </div>
+
+        {/* PDF Settings - UNI-ISO */}
+        <div className="neu-flat p-8">
+           <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center">
+            <span className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center mr-3 text-xs">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </span>
+            STAMPA UNI-ISO
+          </h3>
+          <div className="space-y-4">
+             <p className="text-xs text-slate-500 mb-4">Configura la visibilità dei riferimenti normativi nei documenti generati.</p>
+             <label className="flex items-center gap-4 p-4 rounded-xl bg-white/50 border border-slate-100 cursor-pointer hover:bg-white transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={formData.printIsoCitation} 
+                  onChange={(e) => setFormData({ ...formData, printIsoCitation: e.target.checked })}
+                  disabled={!isEditing}
+                  className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 transition-all cursor-pointer"
+                />
+                <span className="text-sm font-bold text-slate-700">Abilita citazione UNI-ISO nel piè di pagina</span>
+             </label>
+             <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-[10px] leading-tight flex gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Nota: Disabilitando questa opzione, la citazione normativa scompare ma la numerazione delle pagine rimane attiva.</span>
+             </div>
           </div>
         </div>
       </div>

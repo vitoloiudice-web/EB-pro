@@ -362,7 +362,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         applyStandardSignature(doc, tableFinalY, adminProfile, "Report Generato da Centrale Acquisti");
 
         // Apply Page Footer (ISO + Pagination)
-        applyPageFooter(doc, "MOD-ANL-01 REV. 05");
+        applyPageFooter(doc, "MOD-ANL-01 REV. 05", adminProfile);
 
         doc.save(`BI_Report_${reportType}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
         setSuccess(`Report PDF generato con successo!`);
