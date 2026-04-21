@@ -7,6 +7,29 @@ interface AdminProfileViewProps {
   client: Client;
 }
 
+interface InputFieldProps {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled: boolean;
+  className?: string;
+}
+
+const InputField = ({ label, name, value, onChange, disabled, className = "" }: InputFieldProps) => (
+  <div className={className}>
+    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2 pl-1">{label}</label>
+    <input 
+      type="text" 
+      name={name} 
+      value={value} 
+      onChange={onChange} 
+      disabled={disabled}
+      className={`w-full neu-input py-3 px-4 text-sm font-medium text-slate-700 transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-100'}`}
+    />
+  </div>
+);
+
 const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
   const [profile, setProfile] = useState<AdminProfile | null>(null);
   const [loading, setLoading] = useState(false);
@@ -187,20 +210,6 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
     </div>
   );
 
-  const InputField = ({ label, name, value, className = "" }: any) => (
-    <div className={className}>
-      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2 pl-1">{label}</label>
-      <input 
-        type="text" 
-        name={name} 
-        value={value} 
-        onChange={handleChange} 
-        disabled={!isEditing}
-        className={`w-full neu-input py-3 px-4 text-sm font-medium text-slate-700 transition-all ${!isEditing ? 'opacity-60 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-100'}`}
-      />
-    </div>
-  );
-
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-10 relative">
       {error && (
@@ -305,10 +314,10 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
             </div>
           </div>
           <div className="space-y-6">
-            <InputField label="Ragione Sociale (Centrale Acquisti)" name="companyName" value={formData.companyName} />
+            <InputField label="Ragione Sociale (Centrale Acquisti)" name="companyName" value={formData.companyName} onChange={handleChange} disabled={!isEditing} />
             <div className="grid grid-cols-2 gap-6">
-              <InputField label="Partita IVA" name="vatNumber" value={formData.vatNumber} />
-              <InputField label="Codice Fiscale" name="taxId" value={formData.taxId} />
+              <InputField label="Partita IVA" name="vatNumber" value={formData.vatNumber} onChange={handleChange} disabled={!isEditing} />
+              <InputField label="Codice Fiscale" name="taxId" value={formData.taxId} onChange={handleChange} disabled={!isEditing} />
             </div>
           </div>
         </div>
@@ -317,14 +326,14 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
         <div className="neu-flat p-8">
            <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center">
              <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 text-xs">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 00-2 2z" /></svg>
              </span>
             Contatti
           </h3>
           <div className="space-y-6">
-            <InputField label="Email Ufficiale" name="email" value={formData.email} />
-            <InputField label="Telefono" name="phone" value={formData.phone} />
-            <InputField label="Sito Web" name="website" value={formData.website} />
+            <InputField label="Email Ufficiale" name="email" value={formData.email} onChange={handleChange} disabled={!isEditing} />
+            <InputField label="Telefono" name="phone" value={formData.phone} onChange={handleChange} disabled={!isEditing} />
+            <InputField label="Sito Web" name="website" value={formData.website} onChange={handleChange} disabled={!isEditing} />
           </div>
         </div>
 
@@ -337,19 +346,19 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
             Sede Legale
           </h3>
           <div className="space-y-6">
-             <InputField label="Indirizzo" name="address" value={formData.address} />
+             <InputField label="Indirizzo" name="address" value={formData.address} onChange={handleChange} disabled={!isEditing} />
             <div className="grid grid-cols-6 gap-4">
               <div className="col-span-2">
-                <InputField label="CAP" name="zipCode" value={formData.zipCode} />
+                <InputField label="CAP" name="zipCode" value={formData.zipCode} onChange={handleChange} disabled={!isEditing} />
               </div>
               <div className="col-span-3">
-                <InputField label="Città" name="city" value={formData.city} />
+                <InputField label="Città" name="city" value={formData.city} onChange={handleChange} disabled={!isEditing} />
               </div>
               <div className="col-span-1">
-                <InputField label="PR" name="province" value={formData.province} />
+                <InputField label="PR" name="province" value={formData.province} onChange={handleChange} disabled={!isEditing} />
               </div>
             </div>
-             <InputField label="Nazione" name="country" value={formData.country} />
+             <InputField label="Nazione" name="country" value={formData.country} onChange={handleChange} disabled={!isEditing} />
           </div>
         </div>
 
@@ -362,12 +371,11 @@ const AdminProfileView: React.FC<AdminProfileViewProps> = ({ client }) => {
             Coordinate Bancarie
           </h3>
           <div className="space-y-6">
-            <InputField label="Banca" name="bankName" value={formData.bankName} />
-            <InputField label="IBAN" name="iban" value={formData.iban} />
-            <InputField label="SWIFT / BIC" name="swift" value={formData.swift} />
+            <InputField label="Banca" name="bankName" value={formData.bankName} onChange={handleChange} disabled={!isEditing} />
+            <InputField label="IBAN" name="iban" value={formData.iban} onChange={handleChange} disabled={!isEditing} />
+            <InputField label="SWIFT / BIC" name="swift" value={formData.swift} onChange={handleChange} disabled={!isEditing} />
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -16,6 +16,59 @@ import { auth, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import Tooltip from './components/common/Tooltip';
 
+// --- SUB-COMPONENTS ---
+
+interface NavItemProps {
+  view: ViewState;
+  label: string;
+  icon?: React.ReactNode;
+  params?: any;
+  currentView: ViewState;
+  viewParams: any;
+  onNavigate: (view: ViewState, params?: any) => void;
+  tooltip?: { title: string, description: string, usage: string };
+}
+
+const NavItem = ({ view, label, icon, params, currentView, viewParams, onNavigate, tooltip }: NavItemProps) => {
+  const isActive = currentView === view && (!params || JSON.stringify(viewParams) === JSON.stringify(params));
+  const button = (
+    <button 
+      onClick={() => onNavigate(view, params)}
+      className={`w-full text-left px-5 py-3.5 mb-1 rounded-xl flex items-center transition-all duration-200 group ${isActive ? 'neu-pressed text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'}`}
+    >
+      {icon && <span className={`mr-3 ${isActive ? 'text-blue-500' : 'text-slate-400 group-hover:text-slate-600'}`}>{icon}</span>}
+      {label}
+    </button>
+  );
+
+  return tooltip ? <Tooltip content={tooltip} position="right" className="w-full">{button}</Tooltip> : button;
+};
+
+interface SubNavItemProps {
+  view: ViewState;
+  label: string;
+  params?: any;
+  currentView: ViewState;
+  viewParams: any;
+  onNavigate: (view: ViewState, params?: any) => void;
+  tooltip?: { title: string, description: string, usage: string };
+}
+
+const SubNavItem = ({ view, label, params, currentView, viewParams, onNavigate, tooltip }: SubNavItemProps) => {
+  const isActive = currentView === view && JSON.stringify(viewParams) === JSON.stringify(params);
+  const button = (
+    <button 
+      onClick={() => onNavigate(view, params)}
+      className={`w-full text-left px-5 py-2 mb-1 rounded-lg flex items-center transition-all duration-200 text-xs ${isActive ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full mr-3 ${isActive ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
+      {label}
+    </button>
+  );
+
+  return tooltip ? <Tooltip content={tooltip} position="right" className="w-full">{button}</Tooltip> : button;
+};
+
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: any) {
@@ -186,35 +239,23 @@ function App() {
     }
   };
 
-  const NavItem = ({ view, label, icon, params, tooltip }: { view: ViewState, label: string, icon?: React.ReactNode, params?: any, tooltip?: { title: string, description: string, usage: string } }) => {
-    const isActive = currentView === view && (!params || JSON.stringify(viewParams) === JSON.stringify(params));
-    const button = (
-      <button 
-        onClick={() => navigateTo(view, params)}
-        className={`w-full text-left px-5 py-3.5 mb-1 rounded-xl flex items-center transition-all duration-200 group ${isActive ? 'neu-pressed text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'}`}
-      >
-        {icon && <span className={`mr-3 ${isActive ? 'text-blue-500' : 'text-slate-400 group-hover:text-slate-600'}`}>{icon}</span>}
-        {label}
-      </button>
-    );
+  const SidebarNavItem = (props: any) => (
+    <NavItem 
+      {...props} 
+      currentView={currentView} 
+      viewParams={viewParams} 
+      onNavigate={navigateTo} 
+    />
+  );
 
-    return tooltip ? <Tooltip content={tooltip} position="right" className="w-full">{button}</Tooltip> : button;
-  };
-
-  const SubNavItem = ({ view, label, params, tooltip }: { view: ViewState, label: string, params?: any, tooltip?: { title: string, description: string, usage: string } }) => {
-    const isActive = currentView === view && JSON.stringify(viewParams) === JSON.stringify(params);
-    const button = (
-      <button 
-        onClick={() => navigateTo(view, params)}
-        className={`w-full text-left px-5 py-2 mb-1 rounded-lg flex items-center transition-all duration-200 text-xs ${isActive ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-700 hover:bg-white/30'}`}
-      >
-        <span className={`w-1.5 h-1.5 rounded-full mr-3 ${isActive ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
-        {label}
-      </button>
-    );
-
-    return tooltip ? <Tooltip content={tooltip} position="right" className="w-full">{button}</Tooltip> : button;
-  };
+  const SidebarSubNavItem = (props: any) => (
+    <SubNavItem 
+      {...props} 
+      currentView={currentView} 
+      viewParams={viewParams} 
+      onNavigate={navigateTo} 
+    />
+  );
 
   if (isAuthLoading) {
     return (
@@ -286,7 +327,7 @@ function App() {
 
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.DASHBOARD} 
                  label="Dashboard" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>}
@@ -299,7 +340,7 @@ function App() {
                
                <div className="my-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Operations</div>
                
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.MRP} 
                  label="MRP & Scorte" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
@@ -309,7 +350,7 @@ function App() {
                     usage: "Gestisci fabbisogni netti, lead time e proposte d'ordine."
                  }}
                />
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.LOGISTICS} 
                  label="Logistica & Ordini" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
@@ -319,7 +360,7 @@ function App() {
                     usage: "Monitora lo stato degli ordini d'acquisto e le spedizioni."
                  }}
                />
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.SUPPLIER_QUALIFICATION} 
                  label="Qualifica Fornitori" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
@@ -329,7 +370,7 @@ function App() {
                     usage: "Gestisci criteri di qualifica, rating e audit fornitori."
                  }}
                />
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.SUPPLIER_SCOUTING} 
                  label="Scouting AI" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>}
@@ -342,7 +383,7 @@ function App() {
 
                <div className="my-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Intelligence</div>
 
-               <NavItem 
+               <SidebarNavItem 
                  view={ViewState.BI} 
                  label="Business Analytics" 
                  icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
@@ -356,21 +397,21 @@ function App() {
                <div className="my-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Anagrafiche</div>
                
                <div className="space-y-1">
-                 <NavItem 
+                 <SidebarNavItem 
                    view={ViewState.MASTER_DATA} 
                    label="ANAGRAFE" 
                    icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
                  />
                  {(currentView === ViewState.MASTER_DATA) && (
                     <div className="ml-8 space-y-1 animate-fade-in">
-                      <SubNavItem view={ViewState.MASTER_DATA} label="Articoli" params={{ tab: 'ARTICOLI' }} tooltip={{ title: "Anagrafe Articoli", description: "Gestione record articoli con logiche e-Solver (Phantom, Conto Lavoro, Multi-UM).", usage: "Seleziona per gestire il catalogo prodotti." }} />
-                      <SubNavItem view={ViewState.MASTER_DATA} label="Fornitori" params={{ tab: 'SUPPLIERS' }} tooltip={{ title: "Anagrafe Fornitori", description: "Database centralizzato dei partner di fornitura con rating e termini di pagamento.", usage: "Seleziona per gestire i fornitori." }} />
-                      <SubNavItem view={ViewState.MASTER_DATA} label="Clienti" params={{ tab: 'CUSTOMERS' }} tooltip={{ title: "Anagrafe Clienti", description: "Anagrafica clienti con gestione contratti e canoni mensili.", usage: "Seleziona per gestire il portafoglio clienti." }} />
+                      <SidebarSubNavItem view={ViewState.MASTER_DATA} label="Articoli" params={{ tab: 'ARTICOLI' }} tooltip={{ title: "Anagrafe Articoli", description: "Gestione record articoli con logiche e-Solver (Phantom, Conto Lavoro, Multi-UM).", usage: "Seleziona per gestire il catalogo prodotti." }} />
+                      <SidebarSubNavItem view={ViewState.MASTER_DATA} label="Fornitori" params={{ tab: 'SUPPLIERS' }} tooltip={{ title: "Anagrafe Fornitori", description: "Database centralizzato dei partner di fornitura con rating e termini di pagamento.", usage: "Seleziona per gestire i fornitori." }} />
+                      <SidebarSubNavItem view={ViewState.MASTER_DATA} label="Clienti" params={{ tab: 'CUSTOMERS' }} tooltip={{ title: "Anagrafe Clienti", description: "Anagrafica clienti con gestione contratti e canoni mensili.", usage: "Seleziona per gestire il portafoglio clienti." }} />
                     </div>
                   )}
                </div>
                <div className="mt-8 border-t border-slate-200 pt-4">
-                 <NavItem 
+                 <SidebarNavItem 
                    view={ViewState.SETTINGS} 
                    label="Impostazioni" 
                    icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
