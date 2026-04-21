@@ -251,30 +251,29 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                 <tr>
                   {activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS' && (
                       <>
-                          <th className="p-4">SKU / MPN</th>
-                          <th className="p-4">Descrizione</th>
-                          <th className="p-4">Rev.</th>
-                          <th className="p-4">Classificazione</th>
-                          <th className="p-4 text-right">Costo Pref.</th>
-                          <th className="p-4">Produttore</th>
+                          <th className="p-4">Articolo</th>
+                          <th className="p-4 hidden sm:table-cell">Rev.</th>
+                          <th className="p-4 hidden md:table-cell">Classificazione</th>
+                          <th className="p-4 text-right">Costo</th>
+                          <th className="p-4 hidden lg:table-cell">Produttore</th>
                       </>
                   )}
                   {activeMainTab === 'SUPPLIERS' && (
                        <>
-                          <th className="p-4">ID</th>
+                          <th className="p-4 hidden sm:table-cell">ID</th>
                           <th className="p-4">Ragione Sociale</th>
-                          <th className="p-4">Rating</th>
-                          <th className="p-4">Email</th>
-                          <th className="p-4">Pagamento</th>
+                          <th className="p-4 text-center">Rating</th>
+                          <th className="p-4 hidden md:table-cell">Email</th>
+                          <th className="p-4 hidden lg:table-cell">Pagamento</th>
                        </>
                   )}
                   {activeMainTab === 'CUSTOMERS' && (
                        <>
                           <th className="p-4">Cliente</th>
-                          <th className="p-4">P.IVA</th>
-                          <th className="p-4">Email</th>
+                          <th className="p-4 hidden sm:table-cell">P.IVA</th>
+                          <th className="p-4 hidden md:table-cell">Email</th>
                           <th className="p-4">Zona</th>
-                          <th className="p-4">Pagamento</th>
+                          <th className="p-4 hidden lg:table-cell">Pagamento</th>
                        </>
                   )}
                   <th className="p-4 text-center w-24">Azioni</th>
@@ -289,50 +288,34 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                 {!loading && activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS' && (data as Item[]).map((item, idx) => (
                   <tr key={idx}>
                     <td className="p-4">
-                        <div className="font-mono text-xs font-bold text-slate-700">{item.sku}</div>
-                        {item.manufacturer?.mpn && <div className="font-mono text-[10px] text-slate-400">MPN: {item.manufacturer.mpn}</div>}
-                        {item.customerCode && <div className="font-mono text-[10px] text-blue-500 font-bold mt-1">Cod. Cliente: {item.customerCode}</div>}
-                        {item.customerCodes && item.customerCodes.length > 0 && (
-                            <div className="mt-1 space-y-0.5">
-                                {item.customerCodes.map((cc, i) => (
-                                    <div key={i} className="font-mono text-[10px] text-blue-600">
-                                        <span className="font-bold">{cc.customerName || 'Cliente'}:</span> {cc.code}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </td>
-                    <td className="p-4">
+                        <div className="font-mono text-[10px] font-bold text-slate-400">{item.sku}</div>
                         <div className="font-bold text-slate-700 text-sm">{item.name}</div>
-                        <div className="text-xs text-slate-400">{item.description}</div>
+                        <div className="text-xs text-slate-400 sm:line-clamp-1">{item.description}</div>
+                        {item.manufacturer?.mpn && <div className="font-mono text-[10px] text-slate-400">MPN: {item.manufacturer.mpn}</div>}
                     </td>
-                    <td className="p-4 font-mono text-xs text-slate-500 font-bold">{item.revision}</td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black text-blue-700 bg-blue-100 uppercase">
+                    <td className="p-4 hidden sm:table-cell font-mono text-xs text-slate-500 font-bold text-center">
+                        <span className="px-1.5 py-0.5 bg-slate-100 rounded">{item.revision}</span>
+                    </td>
+                    <td className="p-4 hidden md:table-cell">
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black text-blue-700 bg-blue-100 uppercase">
                           {item.category}
                         </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 bg-slate-200">
-                          {item.group}
-                        </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 bg-slate-200">
-                          {item.macroFamily}
-                        </span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 bg-slate-200">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-200 uppercase">
                           {item.family}
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 text-right font-mono text-slate-600">€ {(item.cost || 0).toFixed(2)}</td>
-                    <td className="p-4 text-slate-500 text-sm">
+                    <td className="p-4 text-right font-mono text-slate-600 font-bold whitespace-nowrap">€ {(item.cost || 0).toFixed(2)}</td>
+                    <td className="p-4 hidden lg:table-cell text-slate-500 text-xs">
                         {item.manufacturer?.name || '-'}
                     </td>
                     <td className="p-4 text-center">
                       <button 
                         onClick={() => handleEdit(item)}
-                        className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       >
-                        Dettagli
+                         <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                       </button>
                     </td>
                   </tr>
@@ -340,22 +323,28 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
 
                 {!loading && activeMainTab === 'SUPPLIERS' && (data as Supplier[]).map((sup, idx) => (
                   <tr key={idx}>
-                    <td className="p-4 font-mono text-xs text-slate-500">{sup.id}</td>
-                    <td className="p-4 font-bold text-slate-700">{sup.name}</td>
+                    <td className="p-4 hidden sm:table-cell font-mono text-[10px] text-slate-400 uppercase tracking-tighter truncate max-w-[80px]">{sup.id}</td>
                     <td className="p-4">
-                      <div className="flex items-center">
-                        <span className="text-amber-400 mr-1 text-lg">★</span>
-                        <span className="text-slate-700 font-bold">{sup.rating}</span>
-                      </div>
+                      <div className="font-bold text-slate-700 text-sm truncate max-w-[150px]">{sup.name}</div>
+                      <div className="text-[10px] text-slate-400 md:hidden truncate max-w-[150px]">{sup.email}</div>
                     </td>
-                    <td className="p-4 text-slate-600 text-sm">{sup.email}</td>
-                    <td className="p-4 text-slate-500 text-sm">{sup.paymentTerms}</td>
+                    <td className="p-4 text-center">
+                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                           String(sup.rating) === 'A' || sup.rating >= 4 ? 'text-emerald-700 bg-emerald-100' : 
+                           String(sup.rating) === 'B' || sup.rating === 3 ? 'text-blue-700 bg-blue-100' : 
+                           'text-amber-700 bg-amber-100'
+                         }`}>
+                           RATING {sup.rating}
+                         </span>
+                    </td>
+                    <td className="p-4 hidden md:table-cell text-slate-600 text-xs truncate max-w-[150px]">{sup.email}</td>
+                    <td className="p-4 hidden lg:table-cell text-slate-500 text-xs whitespace-nowrap">{sup.paymentTerms}</td>
                     <td className="p-4 text-center">
                       <button 
                         onClick={() => handleEdit(sup)}
-                        className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       >
-                        Edit
+                        <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                       </button>
                     </td>
                   </tr>
@@ -364,32 +353,28 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                 {!loading && activeMainTab === 'CUSTOMERS' && (data as Customer[]).map((cust, idx) => (
                   <tr key={idx}>
                     <td className="p-4">
-                      <div className="font-bold text-slate-700">{cust.name}</div>
-                      <div className="text-xs text-slate-400">{cust.address}</div>
+                      <div className="font-bold text-slate-700 text-sm">{cust.name}</div>
+                      <div className="text-[10px] text-slate-400 line-clamp-1">{cust.address}</div>
                     </td>
-                    <td className="p-4 font-mono text-xs text-slate-500">{cust.vatNumber}</td>
-                    <td className="p-4 text-blue-600 text-sm cursor-pointer">{cust.email}</td>
-                    <td className="p-4 text-slate-600 text-sm">{cust.region}</td>
-                    <td className="p-4 text-slate-500 text-sm">{cust.paymentTerms}</td>
+                    <td className="p-4 hidden sm:table-cell font-mono text-[10px] text-slate-500">{cust.vatNumber}</td>
+                    <td className="p-4 hidden md:table-cell text-blue-600 text-xs truncate max-w-[120px]">{cust.email}</td>
+                    <td className="p-4 text-slate-600 text-xs font-bold uppercase tracking-tighter">{cust.region}</td>
+                    <td className="p-4 hidden lg:table-cell text-slate-500 text-xs">{cust.paymentTerms}</td>
                     <td className="p-4 text-center">
-                      <div className="flex justify-center gap-4">
+                      <div className="flex justify-center gap-1">
                         <button 
                             onClick={() => handleExportContractPDF(cust)}
-                            className="text-blue-600 hover:text-blue-800 font-bold text-[10px] uppercase border border-blue-100 px-2 py-1 rounded bg-white shadow-sm"
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Contratto"
                         >
-                            Contratto
-                        </button>
-                        <button 
-                            onClick={() => handleExportInvoicePDF(cust)}
-                            className="text-emerald-600 hover:text-emerald-800 font-bold text-[10px] uppercase border border-emerald-100 px-2 py-1 rounded bg-white shadow-sm"
-                        >
-                            Fattura
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </button>
                         <button 
                             onClick={() => handleEdit(cust)}
-                            className="text-slate-600 hover:text-slate-800 font-bold text-[10px] uppercase"
+                            className="p-1.5 text-slate-600 hover:bg-slate-50 rounded transition-colors"
+                            title="Modifica"
                         >
-                            Modifica
+                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         </button>
                       </div>
                     </td>

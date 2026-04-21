@@ -30,24 +30,43 @@ export const applyStandardHeader = (
 
   // 1. Logo Area (Top Left)
   const logoY = 15;
-  const logoHeight = 19;
+  const logoMaxWidth = 42;
+  const logoMaxHeight = 20;
+  let finalLogoHeight = logoMaxHeight;
+
   if (adminProfile?.logoUrl) {
     try {
-      // Reduced size by 5% as per request: 38x19
-      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, 38, logoHeight);
+      // Get image properties to maintain aspect ratio within 42x20 box
+      const imgProps = (doc as any).getImageProperties(adminProfile.logoUrl);
+      const ratio = imgProps.width / imgProps.height;
+      
+      let finalWidth = logoMaxWidth;
+      let finalHeight = logoMaxWidth / ratio;
+      
+      if (finalHeight > logoMaxHeight) {
+        finalHeight = logoMaxHeight;
+        finalWidth = logoMaxHeight * ratio;
+      }
+      
+      finalLogoHeight = finalHeight;
+      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, finalWidth, finalHeight);
     } catch (e) {
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text(adminProfile?.companyName || "LOGO", margin, logoY + 5);
+      finalLogoHeight = 5;
     }
   } else {
     doc.setFontSize(10);
     doc.setTextColor(200);
     doc.text("Logo Aziendale", margin, logoY + 10);
+    finalLogoHeight = 10;
   }
 
   // 2. Title - Right Aligned (Positioned BELOW logo with spacing)
-  const titleY = logoY + logoHeight + 12; // Spacing after logo
+  // Gap between bottom of logo and title increased by 3% (from 12 to 12.36)
+  const gap = 12.36;
+  const titleY = logoY + finalLogoHeight + gap; 
   doc.setFont(doc.getFont().fontName, 'bold');
   doc.setFontSize(22);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Pantone 648 C

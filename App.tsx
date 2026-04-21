@@ -272,8 +272,12 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#EEF2F6] p-4">
         <div className="max-w-md w-full neu-flat p-8 sm:p-12 rounded-[2rem] text-center">
-          <div className="w-20 h-20 neu-flat flex items-center justify-center rounded-3xl text-blue-600 font-black text-3xl tracking-tighter mx-auto mb-8">
-            EB
+          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-8">
+            <img 
+              src="/eb_logo.png" 
+              className="w-full h-full object-contain drop-shadow-sm" 
+              alt="Logo EB-pro" 
+            />
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">EB-pro</h1>
           <p className="text-slate-500 mb-10 leading-relaxed">
@@ -315,9 +319,13 @@ function App() {
       `}>
          <div className="h-full p-6 flex flex-col w-72">
             {/* Logo Area */}
-            <div className="flex items-center space-x-3 mb-10 px-2">
-              <div className="w-12 h-12 neu-flat flex items-center justify-center rounded-2xl text-blue-600 font-black text-xl tracking-tighter flex-shrink-0">
-                EB
+            <div className="flex items-center space-x-3 mb-10 px-2 animate-fade-in">
+              <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
+                <img 
+                  src="/eb_logo.png" 
+                  className="w-full h-full object-contain" 
+                  alt="EB-pro" 
+                />
               </div>
               <div className="flex flex-col overflow-hidden">
                  <span className="text-xl font-bold tracking-tight text-slate-800 whitespace-nowrap">EB-pro</span>
