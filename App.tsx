@@ -436,14 +436,14 @@ function App() {
         
         {/* Sandbox Indicator */}
         {activeWorkspace.id === 'sandbox-test' && (
-          <div className="bg-amber-500 text-white text-center text-xs font-bold py-1.5 px-4 flex-shrink-0 flex items-center justify-center gap-2 shadow-sm z-50">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.268 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            MODALITÀ SANDBOX ATTIVA - I dati inseriti qui sono fittizi e non intaccano l'ambiente di produzione
+          <div className="bg-amber-500 text-white text-[10px] sm:text-xs font-bold py-1.5 px-2 sm:px-4 flex-shrink-0 flex items-center justify-center gap-1 sm:gap-2 shadow-sm z-50 text-center leading-tight">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.268 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span className="truncate sm:whitespace-normal">SANDBOX ATTIVA - Nessun impatto sulla produzione</span>
           </div>
         )}
 
         {/* Header - Neomorphic style */}
-        <header className="h-16 sm:h-20 flex items-center justify-between px-4 sm:px-8 z-20 flex-shrink-0 neu-flat rounded-bl-[2rem] !border-none">
+        <header className="h-[72px] sm:h-20 flex items-center justify-between px-4 sm:px-8 z-20 flex-shrink-0 neu-flat rounded-bl-[2rem] !border-none">
           <div className="flex items-center">
              <button 
                onClick={() => setSidebarOpen(!isSidebarOpen)} 
@@ -513,10 +513,10 @@ function App() {
                      return newWorkspace;
                    });
                  }}
-                 className={`hidden md:flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${activeWorkspace.id === 'sandbox-test' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
+                 className={`flex items-center px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-colors border ${activeWorkspace.id === 'sandbox-test' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
                  title="Cambia Ambiente"
                >
-                 {activeWorkspace.id === 'sandbox-test' ? 'Esci da Sandbox' : 'Entra in Sandbox'}
+                 {activeWorkspace.id === 'sandbox-test' ? 'Esci da Sandbox' : 'Sandbox'}
                </button>
 
                {/* Font Toggle */}
