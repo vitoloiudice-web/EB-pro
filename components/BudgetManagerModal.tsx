@@ -47,25 +47,52 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
   const generatePDF = () => {
     const doc = new jsPDF();
     const now = new Date().toLocaleDateString('it-IT');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
 
-    // Header
+    // Logo Area (Top Left)
     if (adminProfile?.logoUrl) {
-        // In a real app we'd need to handle image loading/base64
-        // For now we just put text if we can't easily get the image bytes
+        try {
+            // Attempt to add logo. If it's a URL it might fail due to CORS in some envs, 
+            // but for base64 (common in this app) it works perfectly.
+            doc.addImage(adminProfile.logoUrl, 'PNG', margin, 15, 40, 20);
+        } catch (e) {
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(adminProfile?.companyName || "LOGO", margin, 20);
+        }
+    } else {
+        doc.setFontSize(12);
+        doc.setTextColor(200);
+        doc.text("Logo Aziendale", margin, 25);
     }
     
+    // Title - Right Aligned
     doc.setFontSize(22);
     doc.setTextColor(59, 130, 246);
-    doc.text("RICHIESTA APPROVAZIONE BUDGET", 20, 30);
+    const titleText = "RICHIESTA APPROVAZIONE BUDGET";
+    const titleWidth = doc.getTextWidth(titleText);
+    const titleX = pageWidth - margin - titleWidth;
+    doc.text(titleText, titleX, 30);
     
+    // Underline - Thin line below title
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.1);
+    doc.line(titleX, 32, pageWidth - margin, 32);
+    
+    // Date & Client - Right Aligned
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Data: ${now}`, 20, 40);
-    doc.text(`Cliente: ${client.name}`, 20, 45);
+    const dateText = `Data: ${now}`;
+    const clientText = `Cliente: ${client.name}`;
     
+    doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), 45);
+    doc.text(clientText, pageWidth - margin - doc.getTextWidth(clientText), 50);
+    
+    // Body Text
     doc.setFontSize(14);
     doc.setTextColor(50);
-    doc.text("Dettaglio Scostamenti Proposti:", 20, 60);
+    doc.text("Dettaglio Scostamenti Proposti:", margin, 75);
 
     const tableRows = localCategories.map(cat => {
         const delta = cat.budget - cat.spent;
@@ -78,7 +105,7 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     });
 
     autoTable(doc, {
-      startY: 70,
+      startY: 85,
       head: [['Categoria', 'Speso (YTD)', 'Budget Proposto', 'Scostamento']],
       body: tableRows,
       theme: 'grid',
