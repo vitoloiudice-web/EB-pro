@@ -3,7 +3,7 @@ import { Client, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { applyStandardHeader, applyStandardFooter, PDF_CONFIG } from '../services/pdfService';
+import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 
 interface BudgetManagerModalProps {
   isOpen: boolean;
@@ -50,7 +50,8 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     const { margin, primaryColor } = PDF_CONFIG;
 
     // Standard Header
-    const startY = applyStandardHeader(doc, "RICHIESTA APPROVAZIONE BUDGET", client.name, adminProfile);
+    const docNum = `REQ-${Math.floor(1000 + Math.random() * 9000)}`;
+    const startY = applyStandardHeader(doc, "RICHIESTA APPROVAZIONE BUDGET", client.name, docNum, adminProfile);
     
     // Body Text
     doc.setFontSize(14);
@@ -81,9 +82,12 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
       }
     });
 
-    // Standard Footer
+    // Standard Signature block
     const finalY = (doc as any).lastAutoTable.finalY + 30;
-    applyStandardFooter(doc, finalY, adminProfile);
+    applyStandardSignature(doc, finalY, adminProfile);
+    
+    // Standard Page Footer (ISO + Pagination)
+    applyPageFooter(doc, "MOD-BDG-01 REV. 02");
     
     return doc;
   };

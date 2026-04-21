@@ -1,21 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { geminiService } from '../services/geminiService';
+import { Client, AdminProfile } from '../types';
+import { dataService } from '../services/dataService';
+import { jsPDF } from 'jspdf';
+import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 
 interface ScoutingActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   candidateName: string;
   itemName: string;
-  companyName: string;
+  client: Client;
 }
 
 type TabType = 'RFI' | 'NDA' | 'RFQ';
 
-const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClose, candidateName, itemName, companyName }) => {
+const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClose, candidateName, itemName, client }) => {
   const [activeTab, setActiveTab] = useState<TabType>('RFI');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadProfile();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && candidateName) {
@@ -23,11 +34,20 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
     }
   }, [isOpen, activeTab, candidateName]);
 
+  const loadProfile = async () => {
+    try {
+      const profile = await dataService.getAdminProfile(client);
+      if (profile) setAdminProfile(profile as AdminProfile);
+    } catch (e) {
+      console.error("Failed to load profile for scouting modal", e);
+    }
+  };
+
   const generateContent = async (type: TabType) => {
     setLoading(true);
     setContent('');
     try {
-      const text = await geminiService.generateEngagementContent(type, candidateName, itemName, companyName);
+      const text = await geminiService.generateEngagementContent(type, candidateName, itemName, client.name);
       setContent(text);
     } catch (e) {
       setContent("Errore durante la generazione.");
@@ -40,6 +60,56 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
     navigator.clipboard.writeText(content);
     setSuccess("Contenuto copiato negli appunti!");
     setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const { margin } = PDF_CONFIG;
+
+    const titles = {
+        'RFI': 'RICHIESTA DI INFORMAZIONI (RFI)',
+        'NDA': 'NON-DISCLOSURE AGREEMENT (NDA)',
+        'RFQ': 'RICHIESTA DI OFFERTA (RFQ)'
+    };
+
+    const docNum = `${activeTab}-${new Date().getTime().toString().slice(-6)}`;
+
+    // Standard Header
+    const startY = applyStandardHeader(
+      doc, 
+      titles[activeTab] || activeTab, 
+      candidateName, 
+      docNum, 
+      adminProfile
+    );
+
+    // Body
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    
+    // Split text to fit page width
+    const splitText = doc.splitTextToSize(content, doc.internal.pageSize.width - (margin * 2));
+    
+    // Check for page overflow
+    let y = startY;
+    const pageHeight = doc.internal.pageSize.height;
+    
+    for (const line of splitText) {
+        if (y > pageHeight - 40) {
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(line, margin, y);
+        y += 6;
+    }
+
+    // Standard Signature
+    const nextY = applyStandardSignature(doc, y + 20, adminProfile);
+
+    // Standard Page Footer (ISO + Pagination)
+    applyPageFooter(doc, `MOD-SCT-${activeTab}-01`);
+
+    doc.save(`${activeTab}_${candidateName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   if (!isOpen) return null;
@@ -103,6 +173,14 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
         {/* Footer */}
         <div className="p-6 border-t border-slate-200 bg-white/50 flex justify-end space-x-4">
             <button onClick={onClose} className="neu-btn px-6 py-2 text-slate-600">Chiudi</button>
+            <button 
+                onClick={handleExportPDF} 
+                disabled={loading || !content}
+                className="neu-btn px-6 py-2 text-blue-600 font-bold border border-blue-100 flex items-center"
+            >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Esporta PDF
+            </button>
             <button 
                 onClick={handleCopy} 
                 disabled={loading || !content}

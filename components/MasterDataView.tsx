@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Client, Item, Supplier, Customer } from '../types';
+import { Client, Item, Supplier, Customer, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import Pagination from './common/Pagination';
 import { usePaginatedData } from '../hooks/usePaginatedData';
@@ -8,6 +8,9 @@ import MasterDataModal from './MasterDataModal';
 import CodingSchemaModal from './CodingSchemaModal';
 import { CodingSchema } from '../types';
 import Tooltip from './common/Tooltip';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 
 interface MasterDataViewProps {
   client: Client;
@@ -34,6 +37,19 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await dataService.getAdminProfile(client);
+        if (profile) setAdminProfile(profile as AdminProfile);
+      } catch (e) {
+        console.error("Failed to load admin profile for MasterDataView", e);
+      }
+    };
+    loadProfile();
+  }, [client]);
 
   // Define fetchers wrapped in useCallback to prevent infinite loops in hook
   const fetchItems = useCallback((p: number, s: number, q: string, f?: any) => client ? dataService.getItems(client, p, s, q, f) : Promise.resolve({ data: [], total: 0 }), [client]);
@@ -108,6 +124,94 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         setError(`Errore eliminazione: ${error.message}`);
         setTimeout(() => setError(null), 5000);
     }
+  };
+
+  const handleExportContractPDF = (cust: Customer) => {
+    const doc = new jsPDF();
+    const { margin } = PDF_CONFIG;
+
+    const docNum = `CTR-${cust.id}-${new Date().getTime().toString().slice(-4)}`;
+    
+    // Standard Header
+    const startY = applyStandardHeader(
+      doc, 
+      "CONTRATTO DI SERVIZIO", 
+      cust.name, 
+      docNum, 
+      adminProfile
+    );
+
+    doc.setFontSize(14);
+    doc.text("Oggetto: Fornitura Servizi di Centrale Acquisti", margin, startY);
+
+    const bodyText = `
+Il presente contratto regola la fornitura dei servizi tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il cliente ${cust.name}.
+
+Dettagli Cliente:
+- P.IVA: ${cust.vatNumber}
+- Indirizzo: ${cust.address}
+- Pagamento: ${cust.paymentTerms}
+
+Validità:
+- Dal: ${cust.contractStartDate || 'N.D.'}
+- Al: ${cust.contractEndDate || 'N.D.'}
+- Canone Mensile: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'}
+
+Termini Generali:
+I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l'analisi della spesa.
+    `;
+
+    doc.setFontSize(10);
+    const splitText = doc.splitTextToSize(bodyText, doc.internal.pageSize.width - (margin * 2));
+    doc.text(splitText, margin, startY + 15);
+
+    applyStandardSignature(doc, startY + 110, adminProfile, "Firma per Accettazione Cliente");
+    applyPageFooter(doc, "MOD-CTR-01 REV. 00");
+
+    doc.save(`Contratto_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  };
+
+  const handleExportInvoicePDF = (cust: Customer) => {
+    const doc = new jsPDF();
+    const { margin, primaryColor } = PDF_CONFIG;
+
+    const docNum = `FT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    
+    // Standard Header
+    const startY = applyStandardHeader(
+      doc, 
+      "FATTURA COMMERCIALE", 
+      cust.name, 
+      docNum, 
+      adminProfile
+    );
+
+    doc.setFontSize(12);
+    doc.text("Dettaglio Servizi:", margin, startY);
+
+    autoTable(doc, {
+      startY: startY + 5,
+      head: [['Descrizione', 'Periodo', 'Importo']],
+      body: [[
+        'Servizio Canone EB-pro Centrale Acquisti',
+        new Date().toLocaleString('it-IT', { month: 'long', year: 'numeric' }),
+        `€ ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'}`
+      ]],
+      theme: 'grid',
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: primaryColor }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+    
+    doc.setFontSize(11);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text(`TOTALE A PAGARE: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'}`, doc.internal.pageSize.width - margin - 60, finalY + 15);
+
+    applyStandardSignature(doc, finalY + 40, adminProfile);
+    applyPageFooter(doc, "MOD-FAT-01 REV. 00");
+
+    doc.save(`Fattura_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   const renderTable = () => {
@@ -268,12 +372,26 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
                     <td className="p-4 text-slate-600 text-sm">{cust.region}</td>
                     <td className="p-4 text-slate-500 text-sm">{cust.paymentTerms}</td>
                     <td className="p-4 text-center">
-                      <button 
-                        onClick={() => handleEdit(cust)}
-                        className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex justify-center gap-4">
+                        <button 
+                            onClick={() => handleExportContractPDF(cust)}
+                            className="text-blue-600 hover:text-blue-800 font-bold text-[10px] uppercase border border-blue-100 px-2 py-1 rounded bg-white shadow-sm"
+                        >
+                            Contratto
+                        </button>
+                        <button 
+                            onClick={() => handleExportInvoicePDF(cust)}
+                            className="text-emerald-600 hover:text-emerald-800 font-bold text-[10px] uppercase border border-emerald-100 px-2 py-1 rounded bg-white shadow-sm"
+                        >
+                            Fattura
+                        </button>
+                        <button 
+                            onClick={() => handleEdit(cust)}
+                            className="text-slate-600 hover:text-slate-800 font-bold text-[10px] uppercase"
+                        >
+                            Modifica
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -10,7 +10,7 @@ import {
 import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { applyStandardHeader, applyStandardFooter, PDF_CONFIG } from '../services/pdfService';
+import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 
@@ -270,10 +270,12 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         const pageWidth = doc.internal.pageSize.getWidth();
 
         // Standard Header
+        const reportId = `BI-${reportType.substring(0, 3)}-${new Date().getTime().toString().slice(-6)}`;
         const startY = applyStandardHeader(
           doc, 
           `BUSINESS ANALYTICS - ${reportType}`, 
           client.name, 
+          reportId,
           adminProfile
         );
 
@@ -355,9 +357,12 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
           columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
         });
 
-        // Add Standard Footer
+        // Add Standard Signature
         const tableFinalY = (doc as any).lastAutoTable.finalY + 20;
-        applyStandardFooter(doc, tableFinalY, adminProfile, "Report Generato da Centrale Acquisti");
+        applyStandardSignature(doc, tableFinalY, adminProfile, "Report Generato da Centrale Acquisti");
+
+        // Apply Page Footer (ISO + Pagination)
+        applyPageFooter(doc, "MOD-ANL-01 REV. 05");
 
         doc.save(`BI_Report_${reportType}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
         setSuccess(`Report PDF generato con successo!`);

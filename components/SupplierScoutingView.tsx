@@ -163,7 +163,7 @@ const SupplierScoutingView: React.FC<SupplierScoutingViewProps> = ({ client }) =
             onClose={() => setActionModalOpen(false)}
             candidateName={selectedCandidateName}
             itemName={scoutMode === 'ITEM' ? selectedItem!.name : 'Servizi Fornitura'}
-            companyName={client.name}
+            client={client}
           />
       )}
 

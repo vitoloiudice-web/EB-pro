@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, PurchaseOrder, Item, Supplier } from '../types';
+import { Client, PurchaseOrder, Item, Supplier, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import ConfirmModal from './common/ConfirmModal';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -30,6 +33,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
   const [loading, setLoading] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,6 +58,9 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
   const loadDependencies = async () => {
     setLoading(true);
     try {
+      const profile = await dataService.getAdminProfile(client);
+      if (profile) setAdminProfile(profile as AdminProfile);
+
       const sups = await dataService.getSuppliers(client, 1, 100, '');
       const its = await dataService.getItems(client, 1, 100, '');
       setSuppliers(sups.data);
@@ -63,6 +70,63 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const { margin, primaryColor } = PDF_CONFIG;
+
+    // Standard Header
+    const startY = applyStandardHeader(
+      doc, 
+      "ORDINE D'ACQUISTO A FORNITORE", 
+      formData.supplierName || "Fornitore non specificato", 
+      formData.id || "N/A", 
+      adminProfile,
+      formData.date
+    );
+
+    // Order Info
+    doc.setFontSize(14);
+    doc.setTextColor(50);
+    doc.text("Dettaglio Prodotti:", margin, startY);
+
+    const tableRows = (formData.items || []).map(item => [
+      item.sku,
+      item.description,
+      item.qty.toString(),
+      `€ ${item.unitPrice.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`,
+      `€ ${item.total.toLocaleString('it-IT', { minimumFractionDigits: 2 })}`
+    ]);
+
+    autoTable(doc, {
+      startY: startY + 10,
+      head: [['SKU', 'Descrizione', 'Qtà', 'P. Unitario', 'Totale']],
+      body: tableRows,
+      theme: 'grid',
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+      columnStyles: {
+        2: { halign: 'center' },
+        3: { halign: 'right' },
+        4: { halign: 'right' }
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+
+    // Total Amount
+    doc.setFontSize(12);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text(`TOTALE ORDINE: € ${(formData.totalAmount || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })}`, doc.internal.pageSize.width - margin - 80, finalY + 15);
+
+    // Standard Signature
+    applyStandardSignature(doc, finalY + 40, adminProfile);
+
+    // Standard Page Footer (ISO + Pagination)
+    applyPageFooter(doc, "MOD-ORD-01 REV. 01");
+
+    doc.save(`Ordine_${formData.id || 'Draft'}_${formData.supplierName?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   if (!isOpen) return null;
@@ -281,13 +345,22 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
         <div className="p-6 border-t border-slate-200 bg-white/50 flex justify-between items-center">
           <div>
             {initialData && onDelete && (
-              <button 
-                onClick={() => setIsConfirmDeleteOpen(true)}
-                className="text-red-500 hover:text-red-700 font-bold text-sm flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Elimina Ordine
-              </button>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsConfirmDeleteOpen(true)}
+                  className="text-red-500 hover:text-red-700 font-bold text-sm flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Elimina Ordine
+                </button>
+                <button 
+                  onClick={handleExportPDF}
+                  className="text-blue-600 hover:text-blue-800 font-bold text-sm flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  Esporta PDF
+                </button>
+              </div>
             )}
           </div>
           <div className="flex space-x-4">
