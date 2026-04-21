@@ -248,8 +248,8 @@ ${adminProfile?.address || ""}`;
                                         {editMode === cat.name ? (
                                             <input 
                                                 type="number"
-                                                value={tempBudget}
-                                                onChange={(e) => setTempBudget(Number(e.target.value))}
+                                                value={tempBudget || 0}
+                                                onChange={(e) => setTempBudget(Number(e.target.value) || 0)}
                                                 className="w-24 text-right neu-pressed px-2 py-1 text-sm font-bold text-blue-600"
                                                 autoFocus
                                             />

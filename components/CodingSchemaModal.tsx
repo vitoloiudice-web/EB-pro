@@ -290,7 +290,7 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
                   <div className="col-span-7">
                     <input
                       type="text"
-                      value={mapping.name}
+                      value={mapping.name || ''}
                       onChange={(e) => handleUpdateMapping(idx, 'name', e.target.value)}
                       className="w-full neu-input px-3 py-1.5 text-xs"
                       placeholder="Es. CABINA"
@@ -299,7 +299,7 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
                   <div className="col-span-4">
                     <input
                       type="text"
-                      value={mapping.code}
+                      value={mapping.code || ''}
                       onChange={(e) => handleUpdateMapping(idx, 'code', e.target.value)}
                       className="w-full neu-input px-3 py-1.5 text-xs font-mono uppercase"
                       placeholder="Es. CA"

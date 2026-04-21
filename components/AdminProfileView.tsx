@@ -22,7 +22,7 @@ const InputField = ({ label, name, value, onChange, disabled, className = "" }: 
     <input 
       type="text" 
       name={name} 
-      value={value} 
+      value={value || ''} 
       onChange={onChange} 
       disabled={disabled}
       className={`w-full neu-input py-3 px-4 text-sm font-medium text-slate-700 transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-100'}`}

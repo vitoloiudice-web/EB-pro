@@ -156,7 +156,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1 pl-1">Rif. Ordine</label>
               <input 
                 type="text" 
-                value={formData.id} 
+                value={formData.id || ''} 
                 onChange={(e) => setFormData({...formData, id: e.target.value})}
                 className="w-full neu-input px-4 py-2 text-sm font-bold text-slate-700"
               />
@@ -165,7 +165,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1 pl-1">Data Ordine</label>
               <input 
                 type="date" 
-                value={formData.date} 
+                value={formData.date || ''} 
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
                 className="w-full neu-input px-4 py-2 text-sm text-slate-700"
               />
@@ -173,7 +173,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1 pl-1">Stato</label>
               <select 
-                value={formData.status} 
+                value={formData.status || 'DRAFT'} 
                 onChange={(e) => setFormData({...formData, status: e.target.value as any})}
                 className="w-full neu-input px-4 py-2 text-sm text-slate-700 bg-transparent"
               >
@@ -191,7 +191,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1 pl-1">Fornitore</label>
               <select 
-                value={formData.supplierId} 
+                value={formData.supplierId || ''} 
                 onChange={(e) => handleSupplierChange(e.target.value)}
                 className="w-full neu-input px-4 py-2 text-sm text-slate-700 bg-transparent"
               >
@@ -203,7 +203,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1 pl-1">Tracking Code</label>
               <input 
                 type="text" 
-                value={formData.trackingCode} 
+                value={formData.trackingCode || ''} 
                 onChange={(e) => setFormData({...formData, trackingCode: e.target.value})}
                 placeholder="Es. DHL-123456"
                 className="w-full neu-input px-4 py-2 text-sm text-slate-700"
@@ -222,7 +222,7 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
                 <div key={idx} className="neu-flat p-3 grid grid-cols-12 gap-2 items-center">
                   <div className="col-span-4">
                     <select 
-                      value={item.sku}
+                      value={item.sku || ''}
                       onChange={(e) => {
                         const it = items.find(i => i.sku === e.target.value);
                         updateItem(idx, { sku: it?.sku, description: it?.name, unitPrice: it?.cost || 0 });
@@ -236,8 +236,8 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
                   <div className="col-span-2">
                     <input 
                       type="number" 
-                      value={item.qty} 
-                      onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) })}
+                      value={item.qty || 0} 
+                      onChange={(e) => updateItem(idx, { qty: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-transparent text-xs text-center border-none focus:ring-0"
                       placeholder="Qtà"
                     />
@@ -245,8 +245,8 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
                   <div className="col-span-3">
                     <input 
                       type="number" 
-                      value={item.unitPrice} 
-                      onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) })}
+                      value={item.unitPrice || 0} 
+                      onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-transparent text-xs text-right border-none focus:ring-0"
                       placeholder="Prezzo"
                     />
