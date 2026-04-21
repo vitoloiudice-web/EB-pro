@@ -24,17 +24,12 @@
 - **AdminProfileView**: Centralized legal, contact, and bank identity management for the procurement center.
 - **MasterDataView**: Robust CRUD for Items (with taxonomic coding), Suppliers, and Customers.
 
-## Recent Changes (Sprint 14)
-- **UI Focus Fix**: Resolved critical "focus loss" bug in `AdminProfileView` by decoupling sub-render logic. Digitazione ora fluida.
-- **React Stability**: Fixed "Controlled vs Uncontrolled" input warnings globally using fallback state patterns.
-- **Email Workflow**: Implemented full lifecycle for budget approval:
-  - Draft saving of deviations status 'PENDING'.
-  - Automated PDF generation (jsPDF).
-  - Server-side email dispatch (`nodemailer`) with attachments.
-- **Production Readiness**:
-  - Configured `scripts` in `package.json` for production lifecycle (`start` command).
-  - Validated Express production middleware for serving SPA assets.
-- **Taxonomic Coding**: Optimized `CodingSchemaModal` for Article SKU auto-generation.
+## Recent Changes (Sprint 15)
+- **Document Numbering API**: Implemented abstract layer in `documentService` supporting persistent numeric progression natively attached to Firestore Transaction counters.
+- **Persistent PDF Backups**: Auto-archival of `.pdf` byte-codes within Firestore via specific `generated_documents` audits registry.
+- **Sandbox Ephemeral Mode**: 
+  - Complete routing bypass in Sandbox environment preventing pollution of production Firebase database.
+  - Volatile caching pattern via browser SessionStorage specifically injected for sequential simulation matching "Exit Sandbox" volatile lifecycle constraints.
 
 ## Pending Tasks
 - [ ] Implement advanced analytics in `BusinessIntelligenceView` for multi-year trends.

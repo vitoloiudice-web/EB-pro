@@ -496,7 +496,23 @@ function App() {
             <div className="flex items-center space-x-2 sm:space-x-4">
                {/* Workspace Toggle */}
                <button
-                 onClick={() => setActiveWorkspace(w => w.id === 'centrale-acquisti' ? SANDBOX_WORKSPACE : PROD_WORKSPACE)}
+                 onClick={() => {
+                   setActiveWorkspace(w => {
+                     const isEnteringSandbox = w.id !== 'sandbox-test';
+                     const newWorkspace = isEnteringSandbox ? SANDBOX_WORKSPACE : PROD_WORKSPACE;
+                     
+                     // Update Sandbox Flag for documentService intercept
+                     sessionStorage.setItem('isSandbox', String(isEnteringSandbox));
+                     
+                     // If exiting sandbox, clear the temporary document cache
+                     if (!isEnteringSandbox) {
+                       sessionStorage.removeItem('sandboxCounters');
+                       sessionStorage.removeItem('sandboxDocuments');
+                     }
+                     
+                     return newWorkspace;
+                   });
+                 }}
                  className={`hidden md:flex items-center px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${activeWorkspace.id === 'sandbox-test' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
                  title="Cambia Ambiente"
                >
