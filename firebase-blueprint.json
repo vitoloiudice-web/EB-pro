@@ -151,6 +151,33 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["client_id", "category_name", "budget_amount"]
+    },
+    "document_counters": {
+      "title": "Document Counter",
+      "description": "Progressive counters for different types of documents",
+      "type": "object",
+      "properties": {
+        "doc_tipo": { "type": "string" },
+        "current_value": { "type": "integer" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["doc_tipo", "current_value"]
+    },
+    "generated_documents": {
+      "title": "Generated Document",
+      "description": "Persistence for generated documents metadata and backup",
+      "type": "object",
+      "properties": {
+        "doc_tipo": { "type": "string" },
+        "doc_num": { "type": "string" },
+        "doc_data": { "type": "string", "format": "date-time" },
+        "doc_ref_id": { "type": "string", "description": "ID of the client or supplier involved" },
+        "doc_ref_type": { "type": "string", "enum": ["CLIENT", "SUPPLIER"] },
+        "pdf_backup_url": { "type": "string", "description": "Reference URL or base64 of the PDF backup" },
+        "created_by": { "type": "string", "description": "User UID who generated the document" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["doc_tipo", "doc_num", "doc_data", "doc_ref_id", "doc_ref_type"]
     }
   },
   "firestore": {
@@ -162,6 +189,8 @@
     "purchase_orders": { "schema": "purchase_orders", "description": "Client purchase orders" },
     "logistics_events": { "schema": "logistics_events", "description": "Client logistics events" },
     "classification_hierarchy": { "schema": "classification_hierarchy", "description": "Item classification levels" },
-    "budget_allocations": { "schema": "budget_allocations", "description": "Planned budgets per category" }
+    "budget_allocations": { "schema": "budget_allocations", "description": "Planned budgets per category" },
+    "document_counters": { "schema": "document_counters", "description": "Incremental counters for documents" },
+    "generated_documents": { "schema": "generated_documents", "description": "History of generated documents" }
   }
 }

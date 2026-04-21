@@ -6,6 +6,7 @@ import ConfirmModal from './common/ConfirmModal';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -72,7 +73,19 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    let docNum = formData.id || "N/A";
+
+    // If ID is random or missing, generate a persistent one
+    if (!docNum || docNum === "N/A" || !docNum.startsWith('PO-')) {
+      try {
+        const nextNum = await getNextDocumentNumber('ORDINE_ACQUISTO');
+        docNum = `PO-${nextNum}`;
+      } catch (err) {
+        console.error("Error generating PO number:", err);
+      }
+    }
+
     const doc = new jsPDF();
     const { margin, primaryColor } = PDF_CONFIG;
 
@@ -81,10 +94,16 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
       doc, 
       "ORDINE D'ACQUISTO A FORNITORE", 
       formData.supplierName || "Fornitore non specificato", 
-      formData.id || "N/A", 
+      docNum, 
       adminProfile,
       formData.date
     );
+
+    // ... rest of PDF generation ...
+    // [Simulating the rest since we need to persist at the end]
+    // Body logic remains same...
+    
+    // Adding persistence after generation (I'll need to wrap the whole function better)
 
     // Order Info
     doc.setFontSize(14);
@@ -126,7 +145,22 @@ const PurchaseOrderModal: React.FC<PurchaseOrderModalProps> = ({ isOpen, onClose
     // Standard Page Footer (ISO + Pagination)
     applyPageFooter(doc, "MOD-ORD-01 REV. 01", adminProfile);
 
-    doc.save(`Ordine_${formData.id || 'Draft'}_${formData.supplierName?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    // PERSISTENCE & BACKUP
+    try {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      await persistGeneratedDocument({
+        doc_tipo: 'ORDINE_ACQUISTO',
+        doc_num: docNum,
+        doc_data: formData.date || new Date().toISOString(),
+        doc_ref_id: formData.supplierId || client.id,
+        doc_ref_type: formData.supplierId ? 'SUPPLIER' : 'CLIENT',
+        pdf_backup_url: pdfBase64
+      });
+    } catch (err) {
+      console.error("Failed to backup PO PDF:", err);
+    }
+
+    doc.save(`Ordine_${docNum}_${formData.supplierName?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   if (!isOpen) return null;

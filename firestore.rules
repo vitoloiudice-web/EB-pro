@@ -85,6 +85,37 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    // ===============================================================
+    // Shared Validation Helpers
+    // ===============================================================
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isValidGeneratedDoc(data) {
+      return data.doc_tipo is string &&
+             data.doc_num is string &&
+             data.doc_data is string &&
+             data.doc_ref_id is string &&
+             data.doc_ref_type in ['CLIENT', 'SUPPLIER'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /document_counters/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidId(docId);
+    }
+
+    match /generated_documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidId(docId) && isValidGeneratedDoc(request.resource.data);
+      allow update, delete: if false; // Immutabile per logica di audit
+    }
+
     // EB-pro Admins: Only admins can manage other admins
     match /eb_pro_admins/{adminId} {
       allow read: if isAuthenticated();

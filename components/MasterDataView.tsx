@@ -11,6 +11,7 @@ import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 
 interface MasterDataViewProps {
   client: Client;
@@ -126,11 +127,17 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     }
   };
 
-  const handleExportContractPDF = (cust: Customer) => {
+  const handleExportContractPDF = async (cust: Customer) => {
     const doc = new jsPDF();
     const { margin } = PDF_CONFIG;
 
-    const docNum = `CTR-${cust.id}-${new Date().getTime().toString().slice(-4)}`;
+    let docNum = `CTR-PENDING`;
+    try {
+      const nextNum = await getNextDocumentNumber('REPORT_ANALYTICS');
+      docNum = `CTR-${nextNum}`;
+    } catch (err) {
+      console.error("Error generating contract doc number:", err);
+    }
     
     // Standard Header
     const startY = applyStandardHeader(
@@ -168,14 +175,35 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
     applyStandardSignature(doc, startY + 110, adminProfile, "Firma per Accettazione Cliente");
     applyPageFooter(doc, "MOD-CTR-01 REV. 00", adminProfile);
 
+    // PERSISTENCE & BACKUP
+    try {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      await persistGeneratedDocument({
+        doc_tipo: 'REPORT_ANALYTICS',
+        doc_num: docNum,
+        doc_data: new Date().toISOString(),
+        doc_ref_id: cust.id,
+        doc_ref_type: 'CLIENT',
+        pdf_backup_url: pdfBase64
+      });
+    } catch (err) {
+      console.error("Failed to backup Contract PDF:", err);
+    }
+
     doc.save(`Contratto_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
-  const handleExportInvoicePDF = (cust: Customer) => {
+  const handleExportInvoicePDF = async (cust: Customer) => {
     const doc = new jsPDF();
     const { margin, primaryColor } = PDF_CONFIG;
 
-    const docNum = `FT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    let docNum = `FT-PENDING`;
+    try {
+      const nextNum = await getNextDocumentNumber('ORDINE_ACQUISTO');
+      docNum = `FT-${new Date().getFullYear()}-${nextNum}`;
+    } catch (err) {
+      console.error("Error generating invoice doc number:", err);
+    }
     
     // Standard Header
     const startY = applyStandardHeader(
@@ -210,6 +238,21 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
 
     applyStandardSignature(doc, finalY + 40, adminProfile);
     applyPageFooter(doc, "MOD-FAT-01 REV. 00", adminProfile);
+
+    // PERSISTENCE & BACKUP
+    try {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      await persistGeneratedDocument({
+        doc_tipo: 'ORDINE_ACQUISTO',
+        doc_num: docNum,
+        doc_data: new Date().toISOString(),
+        doc_ref_id: cust.id,
+        doc_ref_type: 'CLIENT',
+        pdf_backup_url: pdfBase64
+      });
+    } catch (err) {
+      console.error("Failed to backup Invoice PDF:", err);
+    }
 
     doc.save(`Fattura_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };

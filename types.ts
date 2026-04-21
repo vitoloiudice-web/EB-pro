@@ -302,3 +302,17 @@ export interface ImportFieldMapping {
   systemField: keyof PurchaseOrder | 'sku' | 'qty' | 'unitPrice' | 'itemDescription'; // Fields we need to map
   fileColumn: string; // The header in the CSV/Excel
 }
+
+export type DocumentType = 'RICHIESTA_BUDGET' | 'ORDINE_ACQUISTO' | 'QUALIFICA_FORNITORE' | 'REPORT_ANALYTICS';
+
+export interface GeneratedDocument {
+  id?: string;
+  doc_tipo: DocumentType;
+  doc_num: string;
+  doc_data: string;
+  doc_ref_id: string; // ID of the client or supplier involved
+  doc_ref_type: 'CLIENT' | 'SUPPLIER';
+  pdf_backup_url?: string;
+  created_by?: string;
+  created_at?: string;
+}

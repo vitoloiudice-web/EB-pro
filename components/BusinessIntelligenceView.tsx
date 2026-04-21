@@ -11,6 +11,7 @@ import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 
@@ -269,8 +270,16 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         const { margin, primaryColor } = PDF_CONFIG;
         const pageWidth = doc.internal.pageSize.getWidth();
 
+        // Use persistent numbering
+        let reportId = `BI-PENDING`;
+        try {
+          const nextNum = await getNextDocumentNumber('REPORT_ANALYTICS');
+          reportId = `BI-${reportType.substring(0, 3)}-${nextNum}`;
+        } catch (err) {
+          console.error("Error generating report doc number:", err);
+        }
+
         // Standard Header
-        const reportId = `BI-${reportType.substring(0, 3)}-${new Date().getTime().toString().slice(-6)}`;
         const startY = applyStandardHeader(
           doc, 
           `BUSINESS ANALYTICS - ${reportType}`, 
@@ -363,6 +372,21 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
 
         // Apply Page Footer (ISO + Pagination)
         applyPageFooter(doc, "MOD-ANL-01 REV. 05", adminProfile);
+
+        // PERSISTENCE & BACKUP
+        try {
+          const pdfBase64 = doc.output('datauristring').split(',')[1];
+          await persistGeneratedDocument({
+            doc_tipo: 'REPORT_ANALYTICS',
+            doc_num: reportId,
+            doc_data: new Date().toISOString(),
+            doc_ref_id: client.id,
+            doc_ref_type: 'CLIENT',
+            pdf_backup_url: pdfBase64
+          });
+        } catch (err) {
+          console.error("Failed to backup BI PDF:", err);
+        }
 
         doc.save(`BI_Report_${reportType}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
         setSuccess(`Report PDF generato con successo!`);

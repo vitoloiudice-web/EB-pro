@@ -4,6 +4,7 @@ import { dataService } from '../services/dataService';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 
 interface BudgetManagerModalProps {
   isOpen: boolean;
@@ -45,12 +46,11 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     setEditMode(null);
   };
 
-  const generatePDF = () => {
+  const generatePDF = (docNum: string) => {
     const doc = new jsPDF();
     const { margin, primaryColor } = PDF_CONFIG;
 
     // Standard Header
-    const docNum = `REQ-${Math.floor(1000 + Math.random() * 9000)}`;
     const startY = applyStandardHeader(doc, "RICHIESTA APPROVAZIONE BUDGET", client.name, docNum, adminProfile);
     
     // Body Text
@@ -128,15 +128,27 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
       }));
       await dataService.saveBudgetAllocations(client, allocations, 'PENDING');
 
-      // 2. Generate PDF
-      const doc = generatePDF();
+      // 2. Generate Number & PDF
+      const docNumber = await getNextDocumentNumber('RICHIESTA_BUDGET');
+      const fullDocNum = `REQ-${docNumber}`;
+      
+      const doc = generatePDF(fullDocNum);
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+      // 3. Persist and Backup
+      await persistGeneratedDocument({
+        doc_tipo: 'RICHIESTA_BUDGET',
+        doc_num: fullDocNum,
+        doc_data: new Date().toISOString(),
+        doc_ref_id: client.id,
+        doc_ref_type: 'CLIENT',
+        pdf_backup_url: pdfBase64
+      });
       
       // Save locally
       doc.save(`Richiesta_Budget_${client.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
 
-      // 3. Send via Email
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
-      
+      // 4. Send via Email
       const emailBody = `Spettabile ${client.name},
 
 Si invia in allegato la proposta di revisione del budget per le categorie merceologiche in oggetto.

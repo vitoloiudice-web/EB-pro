@@ -4,6 +4,7 @@ import { Client, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { jsPDF } from 'jspdf';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 
 interface ScoutingActionModalProps {
   isOpen: boolean;
@@ -62,17 +63,24 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
     setTimeout(() => setSuccess(null), 3000);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const doc = new jsPDF();
     const { margin } = PDF_CONFIG;
 
-    const titles = {
+    const titles: any = {
         'RFI': 'RICHIESTA DI INFORMAZIONI (RFI)',
         'NDA': 'NON-DISCLOSURE AGREEMENT (NDA)',
         'RFQ': 'RICHIESTA DI OFFERTA (RFQ)'
     };
 
-    const docNum = `${activeTab}-${new Date().getTime().toString().slice(-6)}`;
+    // Use persistent numbering
+    let docNum = `${activeTab}-PENDING`;
+    try {
+      const nextNum = await getNextDocumentNumber('QUALIFICA_FORNITORE');
+      docNum = `${activeTab}-${nextNum}`;
+    } catch (err) {
+      console.error("Error generating doc number:", err);
+    }
 
     // Standard Header
     const startY = applyStandardHeader(
@@ -108,6 +116,21 @@ const ScoutingActionModal: React.FC<ScoutingActionModalProps> = ({ isOpen, onClo
 
     // Standard Page Footer (ISO + Pagination)
     applyPageFooter(doc, `MOD-SCT-${activeTab}-01`, adminProfile);
+
+    // PERSISTENCE & BACKUP
+    try {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      await persistGeneratedDocument({
+        doc_tipo: 'QUALIFICA_FORNITORE',
+        doc_num: docNum,
+        doc_data: new Date().toISOString(),
+        doc_ref_id: client.id,
+        doc_ref_type: 'CLIENT',
+        pdf_backup_url: pdfBase64
+      });
+    } catch (err) {
+      console.error("Failed to backup Scouting PDF:", err);
+    }
 
     doc.save(`${activeTab}_${candidateName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
