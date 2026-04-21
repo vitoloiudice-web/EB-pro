@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,17 +9,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+// Health check
+app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+
 // API Route for sending budget approval request
 app.post("/api/send-budget-request", async (req, res) => {
+  console.log("Received budget request to:", req.body?.to);
   const { to, subject, body, pdfBase64, fileName } = req.body;
 
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-      return res.status(500).json({ 
-          error: "Configurazione Email mancante nel server (GMAIL_USER o GMAIL_APP_PASSWORD)" 
-      });
-  }
-
   try {
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        throw new Error("Configurazione Email mancante nel server (GMAIL_USER o GMAIL_APP_PASSWORD)");
+    }
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -44,16 +45,28 @@ app.post("/api/send-budget-request", async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully to:", to);
     res.json({ success: true, message: "Email inviata con successo" });
   } catch (error: any) {
     console.error("Errore invio email:", error);
-    res.status(500).json({ error: "Errore durante l'invio dell'email", details: error.message });
+    res.status(500).json({ 
+        error: "Errore durante l'invio dell'email", 
+        details: error.message,
+        code: error.code || 'UNKNOWN'
+    });
   }
+});
+
+// Global Error Handler for API
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global Error:", err);
+  res.status(500).json({ error: "Internal Server Error", details: err.message });
 });
 
 // Vite/Static middleware setup
 async function setupServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

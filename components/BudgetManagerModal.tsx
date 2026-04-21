@@ -170,7 +170,15 @@ ${adminProfile?.address || ""}`;
         })
       });
 
-      const result = await response.json();
+      let result: any;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          result = await response.json();
+      } else {
+          const text = await response.text();
+          console.error("Non-JSON response from server:", text);
+          throw new Error("Il server ha restituito una risposta non valida (non-JSON). Verifica i log del server.");
+      }
       
       if (!response.ok) throw new Error(result.error || "Errore invio email");
 
