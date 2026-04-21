@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Client } from '../types';
+import { Client, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
@@ -10,6 +10,7 @@ import {
 import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { applyStandardHeader, applyStandardFooter, PDF_CONFIG } from '../services/pdfService';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 
@@ -36,12 +37,17 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
   const [activeCustomers, setActiveCustomers] = useState<any[]>([]);
   const [showCustomers, setShowCustomers] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
 
   // Fetch real data from database
   useEffect(() => {
     const fetchData = async () => {
       if (!client) return;
       try {
+        // Fetch Admin Profile
+        const profile = await dataService.getAdminProfile(client);
+        if (profile) setAdminProfile(profile as AdminProfile);
+
         const biData = await dataService.getBIData(client);
         if (!biData) return;
 
@@ -260,11 +266,16 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
 
       if (format === 'PDF') {
         const doc = new jsPDF();
-        doc.setFontSize(20);
-        doc.text(`Business Analytics - ${client.name}`, 14, 22);
-        
-        doc.setFontSize(14);
-        doc.text(`Report: ${reportType}`, 14, 32);
+        const { margin, primaryColor } = PDF_CONFIG;
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        // Standard Header
+        const startY = applyStandardHeader(
+          doc, 
+          `BUSINESS ANALYTICS - ${reportType}`, 
+          client.name, 
+          adminProfile
+        );
 
         let bodyData: any[] = [];
         let headData: string[][] = [];
@@ -303,33 +314,35 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
 
         if (bodyData.length > 0) {
           autoTable(doc, {
-            startY: 40,
-            margin: { right: chartImage ? 80 : 14 }, // 65% width se c'è il grafico
+            startY: startY,
+            margin: { right: chartImage ? 80 : margin, left: margin }, // Offset if chart present
             head: headData,
             body: bodyData,
+            headStyles: { fillColor: primaryColor }
           });
         } else {
           doc.setFontSize(12);
-          doc.text("Nessun dato disponibile.", 14, 40);
+          doc.text("Nessun dato disponibile.", margin, startY);
         }
 
         if (chartImage) {
-            // Aggiunge l'immagine a destra (35% larghezza)
-            doc.addImage(chartImage, 'PNG', 135, 40, 65, 50);
+            // Adjust image position based on standardized margin
+            doc.addImage(chartImage, 'PNG', pageWidth - margin - 65, startY, 65, 50);
         }
 
-        // Aggiunge Legenda in fondo
-        let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : 40;
-        if (chartImage && finalY < 95) finalY = 95; // Evita sovrapposizioni col grafico
+        // Add Legenda
+        let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : startY;
+        if (chartImage && finalY < startY + 55) finalY = startY + 55; // Prevent overlap with chart
 
         finalY += 15;
-        if (finalY > doc.internal.pageSize.height - 40) {
+        if (finalY > doc.internal.pageSize.height - 60) {
           doc.addPage();
-          finalY = 20;
+          finalY = margin;
         }
 
         doc.setFontSize(12);
-        doc.text("Legenda:", 14, finalY);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Legenda:", margin, finalY);
         finalY += 5;
         
         autoTable(doc, {
@@ -337,9 +350,14 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
           head: [['Termine', 'Significato']],
           body: getLegendData(reportType),
           theme: 'plain',
+          margin: { left: margin, right: margin },
           styles: { fontSize: 8, cellPadding: 1 },
           columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
         });
+
+        // Add Standard Footer
+        const tableFinalY = (doc as any).lastAutoTable.finalY + 20;
+        applyStandardFooter(doc, tableFinalY, adminProfile, "Report Generato da Centrale Acquisti");
 
         doc.save(`BI_Report_${reportType}_${client.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
         setSuccess(`Report PDF generato con successo!`);

@@ -3,6 +3,7 @@ import { Client, AdminProfile } from '../types';
 import { dataService } from '../services/dataService';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { applyStandardHeader, applyStandardFooter, PDF_CONFIG } from '../services/pdfService';
 
 interface BudgetManagerModalProps {
   isOpen: boolean;
@@ -46,51 +47,15 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const now = new Date().toLocaleDateString('it-IT');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
+    const { margin, primaryColor } = PDF_CONFIG;
 
-    // Logo Area (Top Left) - Size reduced by 5% (from 40x20 to 38x19)
-    if (adminProfile?.logoUrl) {
-        try {
-            doc.addImage(adminProfile.logoUrl, 'PNG', margin, 15, 38, 19);
-        } catch (e) {
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.text(adminProfile?.companyName || "LOGO", margin, 20);
-        }
-    } else {
-        doc.setFontSize(12);
-        doc.setTextColor(200);
-        doc.text("Logo Aziendale", margin, 25);
-    }
-    
-    // Title - Right Aligned - Moved slightly to avoid overlap
-    doc.setFontSize(22);
-    doc.setTextColor(59, 130, 246);
-    const titleText = "RICHIESTA APPROVAZIONE BUDGET";
-    const titleWidth = doc.getTextWidth(titleText);
-    const titleX = pageWidth - margin - titleWidth;
-    doc.text(titleText, titleX, 28);
-    
-    // Underline - Thin line below title
-    doc.setDrawColor(59, 130, 246);
-    doc.setLineWidth(0.1);
-    doc.line(titleX, 30, pageWidth - margin, 30);
-    
-    // Date & Client - Right Aligned
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    const dateText = `Data: ${now}`;
-    const clientText = `Cliente: ${client.name}`;
-    
-    doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), 42);
-    doc.text(clientText, pageWidth - margin - doc.getTextWidth(clientText), 47);
+    // Standard Header
+    const startY = applyStandardHeader(doc, "RICHIESTA APPROVAZIONE BUDGET", client.name, adminProfile);
     
     // Body Text
     doc.setFontSize(14);
     doc.setTextColor(50);
-    doc.text("Dettaglio Scostamenti Proposti:", margin, 70);
+    doc.text("Dettaglio Scostamenti Proposti:", margin, startY);
 
     const tableRows = localCategories.map(cat => {
         const delta = cat.budget - cat.spent;
@@ -103,11 +68,12 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     });
 
     autoTable(doc, {
-      startY: 80,
+      startY: startY + 10,
       head: [['Categoria', 'Speso (YTD)', 'Budget Proposto', 'Scostamento']],
       body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255] },
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
       columnStyles: {
         1: { halign: 'right' },
         2: { halign: 'right' },
@@ -115,14 +81,9 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
       }
     });
 
-    // Signature Area
+    // Standard Footer
     const finalY = (doc as any).lastAutoTable.finalY + 30;
-    doc.setFontSize(12);
-    doc.text("Firma Centrale Acquisti", 20, finalY);
-    
-    doc.setFontSize(10);
-    doc.text(adminProfile?.companyName || "EB-pro Centrale Acquisti", 20, finalY + 10);
-    if (adminProfile?.address) doc.text(adminProfile.address, 20, finalY + 15);
+    applyStandardFooter(doc, finalY, adminProfile);
     
     return doc;
   };
