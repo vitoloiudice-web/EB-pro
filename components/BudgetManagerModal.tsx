@@ -50,12 +50,10 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
 
-    // Logo Area (Top Left)
+    // Logo Area (Top Left) - Size reduced by 5% (from 40x20 to 38x19)
     if (adminProfile?.logoUrl) {
         try {
-            // Attempt to add logo. If it's a URL it might fail due to CORS in some envs, 
-            // but for base64 (common in this app) it works perfectly.
-            doc.addImage(adminProfile.logoUrl, 'PNG', margin, 15, 40, 20);
+            doc.addImage(adminProfile.logoUrl, 'PNG', margin, 15, 38, 19);
         } catch (e) {
             doc.setFontSize(8);
             doc.setTextColor(150);
@@ -67,18 +65,18 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
         doc.text("Logo Aziendale", margin, 25);
     }
     
-    // Title - Right Aligned
+    // Title - Right Aligned - Moved slightly to avoid overlap
     doc.setFontSize(22);
     doc.setTextColor(59, 130, 246);
     const titleText = "RICHIESTA APPROVAZIONE BUDGET";
     const titleWidth = doc.getTextWidth(titleText);
     const titleX = pageWidth - margin - titleWidth;
-    doc.text(titleText, titleX, 30);
+    doc.text(titleText, titleX, 28);
     
     // Underline - Thin line below title
     doc.setDrawColor(59, 130, 246);
     doc.setLineWidth(0.1);
-    doc.line(titleX, 32, pageWidth - margin, 32);
+    doc.line(titleX, 30, pageWidth - margin, 30);
     
     // Date & Client - Right Aligned
     doc.setFontSize(10);
@@ -86,13 +84,13 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     const dateText = `Data: ${now}`;
     const clientText = `Cliente: ${client.name}`;
     
-    doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), 45);
-    doc.text(clientText, pageWidth - margin - doc.getTextWidth(clientText), 50);
+    doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), 42);
+    doc.text(clientText, pageWidth - margin - doc.getTextWidth(clientText), 47);
     
     // Body Text
     doc.setFontSize(14);
     doc.setTextColor(50);
-    doc.text("Dettaglio Scostamenti Proposti:", margin, 75);
+    doc.text("Dettaglio Scostamenti Proposti:", margin, 70);
 
     const tableRows = localCategories.map(cat => {
         const delta = cat.budget - cat.spent;
@@ -105,7 +103,7 @@ const BudgetManagerModal: React.FC<BudgetManagerModalProps> = ({ isOpen, onClose
     });
 
     autoTable(doc, {
-      startY: 85,
+      startY: 80,
       head: [['Categoria', 'Speso (YTD)', 'Budget Proposto', 'Scostamento']],
       body: tableRows,
       theme: 'grid',
