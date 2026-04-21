@@ -274,9 +274,10 @@ function App() {
         <div className="max-w-md w-full neu-flat p-8 sm:p-12 rounded-[2rem] text-center">
           <div className="w-20 h-20 flex items-center justify-center mx-auto mb-8">
             <img 
-              src="/eb_logo.png" 
+              src="./eb_logo.png" 
               className="w-full h-full object-contain drop-shadow-sm" 
               alt="Logo EB-pro" 
+              referrerPolicy="no-referrer"
             />
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">EB-pro</h1>
@@ -322,9 +323,10 @@ function App() {
             <div className="flex items-center space-x-3 mb-10 px-2 animate-fade-in">
               <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
                 <img 
-                  src="/eb_logo.png" 
+                  src="./eb_logo.png" 
                   className="w-full h-full object-contain" 
                   alt="EB-pro" 
+                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="flex flex-col overflow-hidden">
@@ -468,7 +470,12 @@ function App() {
                   {currentView === ViewState.SETTINGS && 'Profilo Aziendale'}
                 </h1>
                 <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest sm:hidden">
-                   <span>EB-pro</span>
+                   <img 
+                     src="./eb_logo.png" 
+                     className="w-4 h-4 object-contain opacity-60" 
+                     alt="EB-pro" 
+                     referrerPolicy="no-referrer"
+                   />
                    <span className="opacity-30">/</span>
                    <span className="text-blue-500">
                       {currentView === ViewState.DASHBOARD && 'Dashboard'}
