@@ -91,14 +91,23 @@ export const persistGeneratedDocument = async (document: GeneratedDocument): Pro
     return virtualId;
   }
 
-  const docData = {
-    ...document,
-    created_by: auth.currentUser?.uid || 'anonymous',
-    created_at: serverTimestamp()
-  };
-  
-  const docRef = await addDoc(collection(db, 'generated_documents'), docData);
-  return docRef.id;
+    const { pdf_backup_url, ...docWithoutBackup } = document;
+    
+    // Check if base64 is too large for Firestore (approaching 1MB limit = ~1,048,576 bytes)
+    // We'll set a safe limit of 700KB for the base64 string
+    const docData = {
+      ...document,
+      created_by: auth.currentUser?.uid || 'anonymous',
+      created_at: serverTimestamp()
+    };
+    
+    if (pdf_backup_url && pdf_backup_url.length > 700000) {
+      console.warn('PDF base64 is too large for Firestore document. Omitting pdf_backup_url.');
+      delete docData.pdf_backup_url;
+    }
+
+    const docRef = await addDoc(collection(db, 'generated_documents'), docData);
+    return docRef.id;
 };
 
 /**
