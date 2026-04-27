@@ -70,6 +70,7 @@ export type ItemGroup = 'CABINA' | 'TELAIO' | 'CONTROTELAIO' | 'VASCA/CASSA' | '
 export interface CodingMapping {
   name: string;
   code: string;
+  parentCodes?: string[]; // Used for relational mapping (e.g., Families belonging to MacroFamilies)
 }
 
 export interface CodingSchemaBranch {

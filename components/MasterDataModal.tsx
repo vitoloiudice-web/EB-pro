@@ -399,6 +399,15 @@ const EnterpriseItemForm: React.FC<{
                                     const branch = isDiretto ? currentSchema.diretto : currentSchema.indiretto;
                                     const safeBranch = branch || { groups: [], macroFamilies: [], families: [], variants: [], revisions: [] };
                                     
+                                    const selectedMacroFamCode = safeBranch.macroFamilies.find(m => m.name === item.macroFamily)?.code;
+                                    const filteredFamilies = safeBranch.families.filter(f => {
+                                        if (!selectedMacroFamCode) return true; // Show all if no macrofamily selected
+                                        if (f.parentCodes && f.parentCodes.length > 0) {
+                                            return f.parentCodes.includes(selectedMacroFamCode);
+                                        }
+                                        return true; // Backward compatibility for unmapped families
+                                    });
+
                                     return (
                                         <>
                                             <SelectGroup 
@@ -410,14 +419,14 @@ const EnterpriseItemForm: React.FC<{
                                             <SelectGroup 
                                                 label="Macrofamiglia" 
                                                 value={item.macroFamily} 
-                                                onChange={(val) => handleFieldChange({macroFamily: val})} 
+                                                onChange={(val) => handleFieldChange({macroFamily: val, family: ''})} // Reset family on change
                                                 options={safeBranch.macroFamilies.map(m => ({ label: `${m.code} - ${m.name}`, value: m.name }))}
                                             />
                                             <SelectGroup 
                                                 label="Famiglia" 
                                                 value={item.family} 
                                                 onChange={(val) => handleFieldChange({family: val})} 
-                                                options={safeBranch.families.map(f => ({ label: `${f.code} - ${f.name}`, value: f.name }))}
+                                                options={filteredFamilies.map(f => ({ label: `${f.code} - ${f.name}`, value: f.name }))}
                                             />
                                             <SelectGroup 
                                                 label="Progressivo" 
