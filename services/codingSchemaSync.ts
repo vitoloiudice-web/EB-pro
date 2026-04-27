@@ -33,7 +33,7 @@ export const syncCodingSchemaFamilies = async (sandboxClientId: string, prodClie
     if (prodSnap.exists()) {
       prodData = prodSnap.data() as AdminProfile;
     } else {
-      prodData = { companyName: 'Centrale Acquisti' }; // Minimal profile
+      prodData = { companyName: 'Centrale Acquisti' } as AdminProfile; // Minimal profile
     }
 
     // 3. Update families in Production data

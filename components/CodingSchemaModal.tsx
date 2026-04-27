@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Client, AdminProfile, CodingSchema, CodingMapping, CodingSchemaBranch } from '../types';
 import { dataService } from '../services/dataService';
 import { syncCodingSchemaFamilies } from '../services/codingSchemaSync';
-import { syncCodingSchemaFamilies } from '../services/codingSchemaSync';
 
 interface CodingSchemaModalProps {
   isOpen: boolean;
@@ -316,9 +315,9 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
                           onClick={() => setOpenDropdown(openDropdown === idx ? null : idx)}
                           className="w-full flex items-center justify-between neu-input px-3 py-1.5 text-xs bg-white text-slate-600 text-left"
                         >
-                          <span className="truncate mr-2">
+                          <span className="truncate mr-2" title={mapping.parentCodes?.join(', ')}>
                             {mapping.parentCodes?.length 
-                              ? `${mapping.parentCodes.length} selezionat${mapping.parentCodes.length === 1 ? 'a' : 'e'}` 
+                              ? mapping.parentCodes.join(', ')
                               : 'Seleziona...'}
                           </span>
                           <svg className="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

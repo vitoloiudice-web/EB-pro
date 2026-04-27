@@ -13,9 +13,8 @@ import SupplierScoutingView from './components/SupplierScoutingView';
 import { dataService } from './services/dataService';
 import { googleSheetsService } from './services/googleSheetsService';
 import { auth, googleProvider } from './firebase';
-import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import { signInWithPopup, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import Tooltip from './components/common/Tooltip';
-import { syncCodingSchemaFamilies } from './services/codingSchemaSync';
 import { syncCodingSchemaFamilies } from './services/codingSchemaSync';
 
 // --- SUB-COMPONENTS ---
@@ -150,6 +149,12 @@ function App() {
   const [fontSize, setFontSize] = useState<'text-sm' | 'text-base' | 'text-lg'>('text-base');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   
+  // Auth state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [authError, setAuthError] = useState('');
+  
   // State for Navigation Parameters (e.g. Filter Logistics by Status)
   const [viewParams, setViewParams] = useState<any>(null);
 
@@ -200,20 +205,30 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  const handleLogin = async () => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
     try {
-      // Check if we are running inside an iframe
-      if (window !== window.top) {
-        // If in iframe, we can't use signInWithPopup reliably due to COOP/COEP headers
-        // We need to prompt the user to open the app in a new tab
-        alert("Per effettuare il login con Google, apri l'applicazione in una nuova scheda cliccando sull'icona in alto a destra, oppure usa questo link: " + window.location.href);
-        return;
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
       }
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (error: any) {
+      console.error("Auth failed:", error);
+      let errorMsg = "Si è verificato un errore durante l'autenticazione.";
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+         errorMsg = "Credenziali non valide.";
+      } else if (error.code === 'auth/email-already-in-use') {
+         errorMsg = "Esiste già un account con questa email.";
+      } else if (error.code === 'auth/weak-password') {
+         errorMsg = "La password deve contenere almeno 6 caratteri.";
+      }
+      setAuthError(errorMsg);
     }
   };
+
+
 
   const handleLogout = async () => {
     try {
@@ -304,17 +319,60 @@ function App() {
             />
           </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2 tracking-tight">EB-pro</h1>
-          <p className="text-slate-500 mb-10 leading-relaxed">
-            Benvenuto nel sistema operativo per il procurement industriale. Accedi per gestire la tua azienda.
+          <p className="text-slate-500 mb-8 leading-relaxed">
+            {isRegistering 
+              ? "Crea un nuovo account per accedere alla piattaforma." 
+              : "Benvenuto nel sistema operativo per il procurement industriale. Accedi per gestire la tua azienda."
+            }
           </p>
           
-          <button 
-            onClick={handleLogin}
-            className="neu-btn w-full py-4 flex items-center justify-center space-x-3 text-lg font-bold group"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 transition-transform group-hover:scale-110" alt="Google" />
-            <span>Accedi con Google</span>
-          </button>
+          <form onSubmit={handleEmailAuth} className="space-y-4 mb-8 text-left">
+            {authError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl">
+                {authError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full neu-input px-4 py-3 rounded-xl focus:outline-none"
+                placeholder="Inserisci la tua email"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full neu-input px-4 py-3 rounded-xl focus:outline-none"
+                placeholder="Inserisci la tua password"
+              />
+            </div>
+            <button 
+              type="submit"
+              className="neu-btn w-full py-4 mt-2 text-lg font-bold text-center block"
+            >
+              {isRegistering ? "Registrati" : "Accedi"}
+            </button>
+          </form>
+
+          <div className="text-center mt-6">
+            <button 
+              onClick={() => {
+                setIsRegistering(!isRegistering);
+                setAuthError('');
+              }}
+              className="text-sm font-bold text-blue-600 hover:text-blue-800"
+            >
+              {isRegistering ? "Hai già un account? Accedi" : "Non hai un account? Registrati"}
+            </button>
+          </div>
           
           <div className="mt-12 pt-8 border-t border-slate-200/60">
             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-[0.2em]">
@@ -551,31 +609,21 @@ function App() {
                 <span className="text-lg">A</span>
               </button>
 
-              {/* Login / Profile */}
-              {!isAuthenticated ? (
-                <button 
-                  onClick={handleLogin}
-                  className="neu-btn px-3 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm"
-                >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4 mr-0 sm:mr-2" alt="Google" />
-                  <span className="hidden sm:inline">Accedi</span>
-                </button>
-              ) : (
-                <div className="flex items-center space-x-3 pl-0 sm:pl-4 border-l-0 sm:border-l border-slate-300/50">
-                  <div className="text-right hidden md:block">
-                     <div className="text-sm font-bold text-slate-700">Admin</div>
-                     <div className="text-xs text-slate-400">Super User</div>
-                     {userEmail && <div className="text-[10px] text-blue-500 font-medium truncate max-w-[150px] mt-0.5">{userEmail}</div>}
-                  </div>
-                  <button 
-                    onClick={handleLogout}
-                    className="neu-flat w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-600 font-bold border-2 border-[#EEF2F6] hover:text-red-500 transition-colors"
-                    title="Logout"
-                  >
-                    {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
-                  </button>
+              {/* Profile */}
+              <div className="flex items-center space-x-3 pl-0 sm:pl-4 border-l-0 sm:border-l border-slate-300/50">
+                <div className="text-right hidden md:block">
+                   <div className="text-sm font-bold text-slate-700">Admin</div>
+                   <div className="text-xs text-slate-400">Super User</div>
+                   {userEmail && <div className="text-[10px] text-blue-500 font-medium truncate max-w-[150px] mt-0.5">{userEmail}</div>}
                 </div>
-              )}
+                <button 
+                  onClick={handleLogout}
+                  className="neu-flat w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-600 font-bold border-2 border-[#EEF2F6] hover:text-red-500 transition-colors"
+                  title="Logout"
+                >
+                  {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
+                </button>
+              </div>
             </div>
           </div>
         </header>
