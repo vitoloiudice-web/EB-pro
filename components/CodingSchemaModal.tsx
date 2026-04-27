@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Client, AdminProfile, CodingSchema, CodingMapping, CodingSchemaBranch } from '../types';
 import { dataService } from '../services/dataService';
+import { syncCodingSchemaFamilies } from '../services/codingSchemaSync';
 
 interface CodingSchemaModalProps {
   isOpen: boolean;
@@ -70,12 +71,12 @@ const defaultSchema: CodingSchema = {
       { name: 'BULLONERIA STRUTTURALE', code: 'BUL' },
       { name: 'SISTEMI PARASPRUZZI', code: 'PAR' },
       { name: 'CARPENTERIA STRUTTURALE', code: 'CAR' },
-      { name: 'PANNELLATURE DI PROTEZIONE', code: 'PAN' },
+      { name: 'PANNELLATURE DI PROT', code: 'PAN' },
       { name: 'SISTEMI DI CHIUSURA', code: 'CHI' },
       { name: 'PATTINI E SLITTE', code: 'PAT' },
       { name: 'SUPPORTI E PERNI', code: 'PER' },
       { name: 'PULSANTIERE', code: 'PUL' },
-      { name: 'ATTACCHI A PETTINE / DIN', code: 'ATT' },
+      { name: 'ATTACCHI A PETTINE / D', code: 'ATT' },
       { name: 'LUCI E INDICATORI', code: 'LUC' },
       { name: 'TAMPONI DI BATTUTA', code: 'TAM' }
     ],
@@ -343,6 +344,47 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
             )}
           </button>
         </div>
+
+        {client.id === 'centrale-acquisti' && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Sincronizzazione Dati</p>
+                <p className="text-xs text-amber-600">Copia le Famiglie salvate nell'ambiente Sandbox in Produzione.</p>
+              </div>
+            </div>
+            <button 
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  const res = await syncCodingSchemaFamilies('sandbox-test', 'centrale-acquisti');
+                  if (res.success) {
+                    // Reload schema after sync
+                    const profile = await dataService.getAdminProfile(client) as AdminProfile;
+                    if (profile && profile.codingSchema) {
+                      setSchema(profile.codingSchema);
+                    }
+                    setError(null);
+                    alert("Sincronizzazione completata con successo!");
+                  } else {
+                    setError(res.message);
+                  }
+                } catch (e: any) {
+                  setError(e.message);
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-xs font-black border border-amber-200 hover:bg-amber-200 transition-colors"
+            >
+              SINCRONIZZA ORA
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

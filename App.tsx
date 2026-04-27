@@ -15,6 +15,7 @@ import { googleSheetsService } from './services/googleSheetsService';
 import { auth, googleProvider } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import Tooltip from './components/common/Tooltip';
+import { syncCodingSchemaFamilies } from './services/codingSchemaSync';
 
 // --- SUB-COMPONENTS ---
 
@@ -176,6 +177,27 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // One-time migration: Sync Families from Sandbox to Production if missing
+  useEffect(() => {
+    if (isAuthenticated) {
+      const performSync = async () => {
+        try {
+          const syncId = 'family_sync_executed_v1';
+          if (!localStorage.getItem(syncId)) {
+            const result = await syncCodingSchemaFamilies('sandbox-test', 'centrale-acquisti');
+            if (result.success) {
+               localStorage.setItem(syncId, 'true');
+               console.log("Migration successful:", result.message);
+            }
+          }
+        } catch (e) {
+          console.error("Migration failed", e);
+        }
+      };
+      performSync();
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = async () => {
     try {

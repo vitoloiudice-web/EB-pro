@@ -481,6 +481,10 @@ class FirestoreService {
       }
       if (error.message && error.message.includes('requires an index')) {
          console.warn('Composite Index missing. A fallback to non-indexed query should occur in production or create the index.');
+         const indexLinkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+         if (indexLinkMatch) {
+            console.info('CLICCA QUESTO LINK PER CREARE L\'INDICE SU FIREBASE: ', indexLinkMatch[0]);
+         }
          // Temporary fallback for Sandbox avoiding index crash
          const fallbackQ = query(collection(db, path), where('client_id', '==', client.id), limit(pageSize));
          const snap = await getDocs(fallbackQ);
