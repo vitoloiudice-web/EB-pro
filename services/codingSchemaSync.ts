@@ -3,42 +3,42 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Client, AdminProfile } from '../types';
 
-export const syncCodingSchemaFamilies = async (sandboxClientId: string, prodClientId: string) => {
-  console.log(`Syncing families from ${sandboxClientId} to ${prodClientId}...`);
+export const syncCodingSchemaFamilies = async (sourceClientId: string, targetClientId: string) => {
+  console.log(`Syncing families from ${sourceClientId} to ${targetClientId}...`);
   
   try {
-    // 1. Get Sandbox Profile
-    const sandboxDocRef = doc(db, 'clients', sandboxClientId, 'settings', 'profile');
-    const sandboxSnap = await getDoc(sandboxDocRef);
+    // 1. Get Source Profile
+    const sourceDocRef = doc(db, 'clients', sourceClientId, 'settings', 'profile');
+    const sourceSnap = await getDoc(sourceDocRef);
     
-    if (!sandboxSnap.exists()) {
-      throw new Error(`Sandbox profile not found for client ${sandboxClientId}`);
+    if (!sourceSnap.exists()) {
+      throw new Error(`Source profile not found for client ${sourceClientId}`);
     }
     
-    const sandboxData = sandboxSnap.data() as AdminProfile;
-    const sandboxFamilies = sandboxData.codingSchema?.diretto?.families;
+    const sourceData = sourceSnap.data() as AdminProfile;
+    const sourceFamilies = sourceData.codingSchema?.diretto?.families;
     
-    if (!sandboxFamilies || sandboxFamilies.length === 0) {
-      console.warn("No families found in Sandbox. Sync aborted to prevent clearing Production.");
-      return { success: false, message: "Sandbox families list is empty." };
+    if (!sourceFamilies || sourceFamilies.length === 0) {
+      console.warn("No families found in Source. Sync aborted to prevent clearing Target.");
+      return { success: false, message: "Source families list is empty." };
     }
     
-    console.log(`Found ${sandboxFamilies.length} families in Sandbox.`);
+    console.log(`Found ${sourceFamilies.length} families in Source.`);
 
-    // 2. Get Production Profile
-    const prodDocRef = doc(db, 'clients', prodClientId, 'settings', 'profile');
-    const prodSnap = await getDoc(prodDocRef);
+    // 2. Get Target Profile
+    const targetDocRef = doc(db, 'clients', targetClientId, 'settings', 'profile');
+    const targetSnap = await getDoc(targetDocRef);
     
-    let prodData: AdminProfile;
-    if (prodSnap.exists()) {
-      prodData = prodSnap.data() as AdminProfile;
+    let targetData: AdminProfile;
+    if (targetSnap.exists()) {
+      targetData = targetSnap.data() as AdminProfile;
     } else {
-      prodData = { companyName: 'Centrale Acquisti' } as AdminProfile; // Minimal profile
+      targetData = { companyName: 'Sandbox Client' } as AdminProfile; // Minimal profile
     }
 
-    // 3. Update families in Production data
-    if (!prodData.codingSchema) {
-      prodData.codingSchema = {
+    // 3. Update families in Target data
+    if (!targetData.codingSchema) {
+      targetData.codingSchema = {
         categories: [
           { name: 'DIRETTO', code: 'D' },
           { name: 'INDIRETTO', code: 'I' }
@@ -48,20 +48,20 @@ export const syncCodingSchemaFamilies = async (sandboxClientId: string, prodClie
       };
     }
     
-    if (!prodData.codingSchema.diretto) {
-      prodData.codingSchema.diretto = { groups: [], macroFamilies: [], families: [], variants: [], revisions: [] };
+    if (!targetData.codingSchema.diretto) {
+      targetData.codingSchema.diretto = { groups: [], macroFamilies: [], families: [], variants: [], revisions: [] };
     }
 
-    prodData.codingSchema.diretto.families = sandboxFamilies;
+    targetData.codingSchema.diretto.families = sourceFamilies;
     
-    // 4. Save to Production
-    await setDoc(prodDocRef, { 
-      ...prodData, 
+    // 4. Save to Target
+    await setDoc(targetDocRef, { 
+      ...targetData, 
       updated_at: serverTimestamp() 
     }, { merge: true });
     
-    console.log("Production profile updated successfully.");
-    return { success: true, message: `Successfully synced ${sandboxFamilies.length} families.` };
+    console.log("Target profile updated successfully.");
+    return { success: true, message: `Successfully synced ${sourceFamilies.length} families.` };
     
   } catch (error: any) {
     console.error("Migration error:", error);

@@ -408,20 +408,16 @@ const CodingSchemaModal: React.FC<CodingSchemaModalProps> = ({ isOpen, onClose, 
               </div>
               <div>
                 <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Sincronizzazione Dati</p>
-                <p className="text-xs text-amber-600">Copia le Famiglie salvate nell'ambiente Sandbox in Produzione.</p>
+                <p className="text-xs text-amber-600">Propaga le Famiglie aggiornate nell'ambiente Produzione verso l'ambiente Sandbox.</p>
               </div>
             </div>
             <button 
               onClick={async () => {
                 setSaving(true);
                 try {
-                  const res = await syncCodingSchemaFamilies('sandbox-test', 'centrale-acquisti');
+                  // Propaga centrale-acquisti (Prod) verso sandbox-test (Sandbox)
+                  const res = await syncCodingSchemaFamilies('centrale-acquisti', 'sandbox-test');
                   if (res.success) {
-                    // Reload schema after sync
-                    const profile = await dataService.getAdminProfile(client) as AdminProfile;
-                    if (profile && profile.codingSchema) {
-                      setSchema(profile.codingSchema);
-                    }
                     setError(null);
                     alert("Sincronizzazione completata con successo!");
                   } else {

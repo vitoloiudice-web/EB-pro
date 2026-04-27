@@ -164,7 +164,7 @@ ${adminProfile?.address || ""}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-           to: client.email || adminProfile?.email || "v.loiudice@easybuypro.com", // Fallback for demo
+           to: client.email || adminProfile?.email || "vitoloiudice@gmail.com", // Fallback for demo
            subject: `Richiesta Approvazione Variazione Budget - ${client.name}`,
            body: emailBody,
            pdfBase64: pdfBase64,
