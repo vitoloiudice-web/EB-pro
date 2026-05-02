@@ -31,7 +31,7 @@ export const geminiService = {
       
       // Updated to 'gemini-3-flash-preview' as per latest guidelines for Basic Text Tasks
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview', 
+        model: 'gemini-1.5-flash', 
         contents: prompt,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
@@ -128,7 +128,7 @@ export const geminiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Use Pro for complex reasoning + search
+        model: 'gemini-1.5-pro', // Use Pro for complex reasoning + search
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }] // Enable Google Search Grounding
@@ -180,7 +180,7 @@ export const geminiService = {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-1.5-flash',
         contents: prompt
       });
       return response.text || "Errore generazione contenuto.";
@@ -213,7 +213,7 @@ Ristorna un JSON con questa struttura esatta:
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Pro for complex document reasoning
+        model: 'gemini-1.5-pro', // Pro for complex document reasoning
         contents: [
           prompt,
           { inlineData: { mimeType, data: cleanBase64 } }
