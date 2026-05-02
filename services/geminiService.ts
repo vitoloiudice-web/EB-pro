@@ -187,5 +187,72 @@ export const geminiService = {
     } catch (error) {
       return "Errore durante la generazione del testo.";
     }
+  },
+
+  analyzeDatasheet: async (base64Data: string, mimeType: string): Promise<any> => {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    
+    const prompt = `Analizza questo documento (datasheet, blueprint o specifica).
+Estrai le seguenti informazioni per creare/aggiornare l'anagrafica articoli.
+Ristorna un JSON con questa struttura esatta:
+{
+  "summary": "Stringa descrittiva: cosa e', cosa fa, a cosa serve, perche si usa, dove potrebbe essere collocato (es. in quale BOM).",
+  "item": {
+    "name": "Nome breve del prodotto",
+    "description": "Descrizione estesa tecnica",
+    "category": "DIRETTO o INDIRETTO",
+    "group": "Gruppo logico (es. ELETTRONICA, MECCANICA, CABINA, TELAIO, ecc.)",
+    "family": "Famiglia di prodotto",
+    "unit": "Unità di misura probabile (PZ, KG, M, LT)",
+    "manufacturer": { "mpn": "Codice prodotto del produttore se trovato", "name": "Nome produttore" }
+  }
+}`;
+
+    // Rimuovi il prefisso data URL se presente
+    const cleanBase64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-pro-preview', // Pro for complex document reasoning
+        contents: [
+          prompt,
+          { inlineData: { mimeType, data: cleanBase64 } }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: { type: Type.STRING },
+              item: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  category: { type: Type.STRING },
+                  group: { type: Type.STRING },
+                  family: { type: Type.STRING },
+                  unit: { type: Type.STRING },
+                  manufacturer: {
+                    type: Type.OBJECT,
+                    properties: {
+                      mpn: { type: Type.STRING },
+                      name: { type: Type.STRING }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("Nessuna risposta dall'AI");
+      return JSON.parse(text);
+    } catch (error) {
+      console.error("Datasheet analysis failed:", error);
+      throw error;
+    }
   }
 };

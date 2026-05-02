@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
+import { geminiService } from '../services/geminiService';
 
 interface MasterDataViewProps {
   client: Client;
@@ -39,6 +40,8 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isSmartImporting, setIsSmartImporting] = useState(false);
+  const smartImportInputRef = React.useRef<HTMLInputElement>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
 
   useEffect(() => {
@@ -132,27 +135,46 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
 
   const handleExportExcel = async () => {
     try {
-      // Export only logical active items for current client
-      // We leverage the fetchItems hook, but passing large 'size' to grab all for simple export flow
-      const fullResponse = await fetchItems(1, 10000, search, filters);
-      const itemsToExport = fullResponse.data as Item[];
-      
-      const worksheetData = itemsToExport.map(item => ({
-        SKU: item.sku,
-        Descrizione: item.description,
-        Gruppo: item.group,
-        Categoria: item.category,
-        MacroFamiglia: item.macroFamily,
-        UnitaMisura: item.unit,
-        CostoUnitario: item.cost,
-        TempoConsegnaGG: item.leadTimeDays,
-        FornitoreID: item.supplierId
-      }));
+      if (activeMainTab === 'ARTICOLI') {
+        const fullResponse = await fetchItems(1, 10000, search, filters);
+        const itemsToExport = fullResponse.data as Item[];
+        
+        const worksheetData = itemsToExport.map(item => ({
+          SKU: item.sku,
+          Descrizione: item.description,
+          Gruppo: item.group,
+          Categoria: item.category,
+          MacroFamiglia: item.macroFamily,
+          Famiglia: item.family,
+          UnitaMisura: item.unit,
+          CostoUnitario: item.cost,
+          TempoConsegnaGG: item.leadTimeDays,
+          FornitoreID: item.supplierId
+        }));
 
-      const ws = XLSX.utils.json_to_sheet(worksheetData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Articoli");
-      XLSX.writeFile(wb, `Export_Articoli_${client.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        const ws = XLSX.utils.json_to_sheet(worksheetData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Articoli");
+        XLSX.writeFile(wb, `Export_Articoli_${client.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      } else if (activeMainTab === 'SUPPLIERS') {
+        const fullResponse = await fetchSuppliers(1, 10000, search);
+        const suppliersToExport = fullResponse.data as Supplier[];
+        
+        const worksheetData = suppliersToExport.map(sup => ({
+          ID: sup.id,
+          RagioneSociale: sup.name,
+          Email: sup.email,
+          Pagamento: sup.paymentTerms,
+          Telefono: sup.phone || '',
+          Status: sup.status || 'PENDING',
+          Rating: sup.rating
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(worksheetData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Fornitori");
+        XLSX.writeFile(wb, `Export_Fornitori_${client.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      }
     } catch (err: any) {
       setError(`Errore Esportazione: ${err.message}`);
     }
@@ -172,38 +194,89 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         const dataJson = XLSX.utils.sheet_to_json(ws);
 
         let importedCount = 0;
+        let updatedCount = 0;
         
-        // Simple mass import logic.
-        for (const row of dataJson as any[]) {
-          const item: Item = {
-            id: `IMPORT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            sku: row.SKU || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            name: row.Descrizione || 'Senza Descrizione',
-            description: row.Descrizione || 'Senza Descrizione',
-            category: row.Categoria || '',
-            group: row.Gruppo || '',
-            macroFamily: row.MacroFamiglia || '',
-            family: row.Famiglia || '',
-            revision: '0',
-            variant: 'A',
-            progressive: '001',
-            unit: row.UnitaMisura || 'PZ',
-            weightKg: 0,
-            isPhantom: false,
-            isSubcontracting: false,
-            leadTimeOffset: 0,
-            cost: typeof row.CostoUnitario === 'number' ? row.CostoUnitario : parseFloat(row.CostoUnitario) || 0,
-            stock: 0,
-            safetyStock: 0,
-            leadTimeDays: typeof row.TempoConsegnaGG === 'number' ? row.TempoConsegnaGG : parseInt(row.TempoConsegnaGG) || 0,
-            supplierId: row.FornitoreID || ''
-          };
-          
-          await dataService.saveItem(client, item, true);
-          importedCount++;
+        if (activeMainTab === 'ARTICOLI') {
+          // Fetch existing items for anti-duplicate check
+          const fullResponse = await dataService.getItemsForClients([client], 1, 10000, '');
+          const existingItems = fullResponse.data as Item[];
+          const existingSkuMap = new Map<string, Item>();
+          existingItems.forEach(item => existingSkuMap.set(item.sku, item));
+
+          // Mass import and update logic for items
+          for (const row of dataJson as any[]) {
+            const sku = row.SKU?.toString() || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const existingItem = existingSkuMap.get(sku);
+
+            const item: Item = {
+              id: existingItem ? existingItem.id : `IMPORT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+              sku: sku,
+              name: row.Descrizione || (existingItem?.name || 'Senza Descrizione'),
+              description: row.Descrizione || (existingItem?.description || 'Senza Descrizione'),
+              category: row.Categoria || (existingItem?.category || ''),
+              group: row.Gruppo || (existingItem?.group || ''),
+              macroFamily: row.MacroFamiglia || (existingItem?.macroFamily || ''),
+              family: row.Famiglia || (existingItem?.family || ''),
+              revision: existingItem?.revision || '0',
+              variant: existingItem?.variant || 'A',
+              progressive: existingItem?.progressive || '001',
+              unit: row.UnitaMisura || (existingItem?.unit || 'PZ'),
+              weightKg: existingItem?.weightKg || 0,
+              isPhantom: existingItem ? existingItem.isPhantom : false,
+              isSubcontracting: existingItem ? existingItem.isSubcontracting : false,
+              leadTimeOffset: existingItem?.leadTimeOffset || 0,
+              cost: typeof row.CostoUnitario === 'number' ? row.CostoUnitario : (parseFloat(row.CostoUnitario) || existingItem?.cost || 0),
+              stock: existingItem?.stock || 0,
+              safetyStock: existingItem?.safetyStock || 0,
+              leadTimeDays: typeof row.TempoConsegnaGG === 'number' ? row.TempoConsegnaGG : (parseInt(row.TempoConsegnaGG) || existingItem?.leadTimeDays || 0),
+              supplierId: row.FornitoreID?.toString() || (existingItem?.supplierId || '')
+            };
+            
+            if (existingItem) {
+              await dataService.saveItem(client, item, false);
+              updatedCount++;
+              existingSkuMap.set(sku, item); // Update map per evitare duplicati infragruppo
+            } else {
+              await dataService.saveItem(client, item, true);
+              importedCount++;
+              existingSkuMap.set(sku, item); // Aggiungi a map per evitare duplicati del file corrente
+            }
+          }
+        } else if (activeMainTab === 'SUPPLIERS') {
+          // Fetch existing suppliers for anti-duplicate check (match by name or ID)
+          const fullResponse = await dataService.getSuppliers(client, 1, 10000, '');
+          const existingSuppliers = fullResponse.data as Supplier[];
+          const existingNameMap = new Map<string, Supplier>();
+          existingSuppliers.forEach(sup => existingNameMap.set(sup.name.toLowerCase(), sup));
+
+          for (const row of dataJson as any[]) {
+            const rawName = row.RagioneSociale || 'Senza Nome';
+            const existingSupplier = existingNameMap.get(rawName.toLowerCase()) || 
+                                     (row.ID ? existingSuppliers.find(s => s.id === row.ID?.toString()) : undefined);
+
+            const supplier: Supplier = {
+              id: existingSupplier ? existingSupplier.id : `SUP-IMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+              name: rawName,
+              email: row.Email || (existingSupplier?.email || ''),
+              paymentTerms: row.Pagamento?.toString() || (existingSupplier?.paymentTerms || 'BB 30 GG'),
+              phone: row.Telefono?.toString() || (existingSupplier?.phone || ''),
+              status: row.Status || (existingSupplier?.status || 'PENDING'),
+              rating: typeof row.Rating === 'number' ? row.Rating : (parseFloat(row.Rating) || existingSupplier?.rating || 0),
+            };
+            
+            if (existingSupplier) {
+              await dataService.saveSupplier(client, supplier, false);
+              updatedCount++;
+              existingNameMap.set(rawName.toLowerCase(), supplier); // Update map
+            } else {
+              await dataService.saveSupplier(client, supplier, true);
+              importedCount++;
+              existingNameMap.set(rawName.toLowerCase(), supplier); // Evita duplicati dello stesso file
+            }
+          }
         }
         
-        setSuccess(`Importazione completata: ${importedCount} articoli caricati.`);
+        setSuccess(`Elaborazione completata: ${importedCount} nuovi caricati, ${updatedCount} aggiornati.`);
         setTimeout(() => setSuccess(null), 3000);
         refresh(); // Reload paginated lists
       } catch (err: any) {
@@ -213,6 +286,89 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleSmartImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSmartImporting(true);
+    setSuccess(null);
+    setError(null);
+
+    try {
+      // FileReader to get Base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => resolve(evt.target?.result as string);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+
+      // Call Gemini for extraction
+      const analysisResult = await geminiService.analyzeDatasheet(base64Data, file.type);
+      
+      const { summary, item: extractedItem } = analysisResult;
+      
+      // Attempt to find a match in DB
+      const fullResponse = await dataService.getItemsForClients([client], 1, 10000, '');
+      const existingItems = fullResponse.data as Item[];
+      
+      // Match by manufacturer MPN or closely matching name/SKU
+      let matchedItem = existingItems.find(i => 
+        (extractedItem.manufacturer?.mpn && i.manufacturer?.mpn === extractedItem.manufacturer.mpn) || 
+        (extractedItem.sku && i.sku === extractedItem.sku)
+      );
+
+      if (matchedItem) {
+        // Prepare to Edit
+        setEditingEntity({
+          ...matchedItem,
+          description: matchedItem.description !== 'Senza Descrizione' ? matchedItem.description : extractedItem.description,
+          category: matchedItem.category || extractedItem.category || '',
+          group: matchedItem.group || extractedItem.group || '',
+          family: matchedItem.family || extractedItem.family || ''
+        });
+        setSuccess(`Trovata corrispondenza: ${matchedItem.sku}. Verificare i dati e salvare.`);
+      } else {
+        // Prepare to Create New
+        setEditingEntity({
+          id: '',
+          sku: `SKU-${Date.now().toString().slice(-4)}`,
+          name: extractedItem.name || 'Nuovo Prodotto da Datasheet',
+          description: extractedItem.description || summary || '',
+          category: extractedItem.category || '',
+          group: extractedItem.group || '',
+          family: extractedItem.family || '',
+          unit: extractedItem.unit || 'PZ',
+          manufacturer: extractedItem.manufacturer || undefined,
+          cost: 0,
+          stock: 0,
+          leadTimeDays: 0,
+          weightKg: 0,
+          revision: '0',
+          variant: 'A',
+          progressive: '001',
+          isPhantom: false,
+          isSubcontracting: false,
+          leadTimeOffset: 0,
+          safetyStock: 0,
+          supplierId: ''
+        });
+        setSuccess(`Nuovo articolo identificato dal datasheet. Rivedi e salva.`);
+      }
+      setIsModalOpen(true);
+      
+      // To alert user of summary
+      setTimeout(() => alert(`Analisi AI completata.\n\nContesto intuito: ${summary}`), 500);
+
+    } catch (err: any) {
+      console.error(err);
+      setError(`Errore Smart Import: ${err.message}`);
+    } finally {
+      setIsSmartImporting(false);
+      if (smartImportInputRef.current) smartImportInputRef.current.value = '';
+    }
   };
 
   const handleExportContractPDF = async (cust: Customer) => {
@@ -572,12 +728,37 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
           <div className="flex space-x-3 mr-4 border-r border-slate-300 pr-4">
             <input 
               type="file" 
+              accept=".pdf,image/*" 
+              className="hidden" 
+              ref={smartImportInputRef} 
+              onChange={handleSmartImport} 
+            />
+            <Tooltip position="bottom" content={{ title: "Smart Import AI", description: "Carica un PDF o un'immagine datasheet/blueprint per far estrarre automaticamente i dati articolo all'intelligenza artificiale.", usage: "Clicca, scegli un PDF/Immagine e aspetta l'analisi." }}>
+              <button 
+                  onClick={() => smartImportInputRef.current?.click()}
+                  disabled={isSmartImporting}
+                  className={`neu-btn px-4 py-2.5 flex items-center gap-2 ${isSmartImporting ? 'text-slate-400 bg-slate-100 cursor-not-allowed' : 'text-purple-600 font-bold hover:bg-purple-50'}`}
+              >
+                  {isSmartImporting ? (
+                    <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  )}
+                  {isSmartImporting ? 'Analisi in corso...' : 'Smart Import AI'}
+              </button>
+            </Tooltip>
+          </div>
+        )}
+        {((activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS') || activeMainTab === 'SUPPLIERS') && (
+          <div className="flex space-x-3 mr-4 border-r border-slate-300 pr-4">
+            <input 
+              type="file" 
               accept=".xlsx,.xls,.csv" 
               className="hidden" 
               ref={fileInputRef} 
               onChange={handleImportExcel} 
             />
-            <Tooltip position="bottom" content={{ title: "Importa Articoli", description: "Carica un file Excel per caricare o aggiornare massivamente gli articoli in anagrafica.", usage: "Clicca per selezionare il file dal tuo computer." }}>
+            <Tooltip position="bottom" content={{ title: "Importa", description: "Carica un file Excel per caricare o aggiornare massivamente i dati.", usage: "Clicca per selezionare il file dal tuo computer." }}>
               <button 
                   onClick={() => fileInputRef.current?.click()}
                   className="neu-btn px-4 py-2.5 text-slate-600 flex items-center gap-2"
@@ -586,7 +767,7 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                   Importa
               </button>
             </Tooltip>
-            <Tooltip position="bottom" content={{ title: "Esporta Articoli", description: "Scarica l'intera lista articoli in formato Excel per un uso esterno o backup.", usage: "Clicca per avviare il download." }}>
+            <Tooltip position="bottom" content={{ title: "Esporta", description: "Scarica l'intera lista in formato Excel per un uso esterno o backup.", usage: "Clicca per avviare il download." }}>
               <button 
                   onClick={handleExportExcel}
                   className="neu-btn px-4 py-2.5 text-slate-600 flex items-center gap-2"
