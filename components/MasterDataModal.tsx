@@ -1185,24 +1185,72 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
   if (!isOpen) return null;
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+    let formattedValue = value;
+
+    if (field === 'province' && typeof value === 'string') {
+        formattedValue = value.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 3);
+    }
+
+    if (['phone', 'adminPhone', 'techPhone', 'salesPhone', 'warehousePhone'].includes(field) && typeof value === 'string' && value.length > 0) {
+        const regionStr = formData.region || '';
+        const isItaly = !regionStr || regionStr.length > 3 || regionStr.toUpperCase() === 'ITA';
+        
+        if (isItaly) {
+            let cleaned = value.replace(/[^\d+]/g, '');
+            if (cleaned.startsWith('0') || cleaned.startsWith('3')) {
+                cleaned = '+39' + cleaned;
+            }
+            if (cleaned.startsWith('+39')) {
+                const num = cleaned.substring(3);
+                if (num.length > 0) {
+                    let prefixLen = 3;
+                    if (num.startsWith('02') || num.startsWith('06')) prefixLen = 2;
+                    let fp = '+39 ';
+                    if (num.length <= prefixLen) {
+                        fp += num;
+                    } else if (num.length <= prefixLen + 3) {
+                        fp += num.substring(0, prefixLen) + ' ' + num.substring(prefixLen);
+                    } else {
+                        fp += num.substring(0, prefixLen) + ' ' + num.substring(prefixLen, prefixLen + 3) + ' ' + num.substring(prefixLen + 3);
+                    }
+                    formattedValue = fp.trim();
+                } else {
+                    formattedValue = cleaned;
+                }
+            } else {
+                formattedValue = cleaned;
+            }
+        }
+    }
+
+    setFormData((prev: any) => ({ ...prev, [field]: formattedValue }));
   };
 
   const handleSubmit = () => {
-    if (type === 'ITEMS' && !formData.sku) {
+    let finalData = { ...formData };
+
+    if (finalData.region) {
+        if (finalData.region.toLowerCase() === 'italia' || finalData.region.toLowerCase() === 'ita') {
+            finalData.region = 'ITA';
+        } else if (finalData.region.length === 3) {
+            finalData.region = finalData.region.toUpperCase();
+        }
+    }
+
+    if (type === 'ITEMS' && !finalData.sku) {
       setError("Lo SKU è obbligatorio per gli articoli.");
       return;
     }
-    if (!formData.name) {
+    if (!finalData.name) {
       setError("Il nome/ragione sociale è obbligatorio.");
       return;
     }
 
     if (type === 'CUSTOMERS') {
-        const pm = formData.paymentMethods || {};
+        const pm = finalData.paymentMethods || {};
         const hasPm = pm.riba?.enabled || pm.bb?.enabled || pm.rd?.enabled || pm.titoli?.enabled || pm.altro?.enabled;
         
-        const pmc = formData.paymentMethodsCentral || {};
+        const pmc = finalData.paymentMethodsCentral || {};
         const hasPmc = pmc.riba?.enabled || pmc.bb?.enabled || pmc.rd?.enabled || pmc.titoli?.enabled || pmc.altro?.enabled;
 
         if (!hasPm) {
@@ -1216,7 +1264,7 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
     }
 
     setError(null);
-    onSave(formData);
+    onSave(finalData);
     onClose();
   };
 
