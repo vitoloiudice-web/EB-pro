@@ -85,6 +85,10 @@ function cleanUndefined(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(cleanUndefined).filter(v => v !== undefined);
   } else if (obj !== null && typeof obj === 'object') {
+    // Preserve custom objects like Firestore FieldValue or Date
+    if (obj.constructor && obj.constructor.name !== 'Object' && obj.constructor.name !== 'Array') {
+      return obj;
+    }
     return Object.fromEntries(
       Object.entries(obj)
         .filter(([_, v]) => v !== undefined)
@@ -160,6 +164,7 @@ class FirestoreService {
         updated_at: serverTimestamp(),
         created_at: isNew ? serverTimestamp() : (item as any).created_at || serverTimestamp()
       });
+      delete data.id;
       
       if (isNew) {
         // Enforce absolute uniqueness of SKU
@@ -237,6 +242,7 @@ class FirestoreService {
     const path = 'suppliers';
     try {
       const data = cleanUndefined({ ...supplier, client_id: client.id, created_at: serverTimestamp() });
+      delete data.id;
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -283,6 +289,7 @@ class FirestoreService {
     const path = 'customers';
     try {
       const data = cleanUndefined({ ...customer, client_id: client.id, created_at: serverTimestamp() });
+      delete data.id;
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -345,6 +352,7 @@ class FirestoreService {
     const path = 'budgets';
     try {
       const data = cleanUndefined({ ...budget, client_id: client.id, updatedAt: new Date().toISOString() });
+      delete data.id;
       
       // If we are creating, set initial amounts
       if (isNew) {
@@ -421,6 +429,7 @@ class FirestoreService {
     try {
       const colRef = collection(db, 'clients', client.id, 'qualificationCriteria');
       const data = cleanUndefined({ ...criterion, updated_at: serverTimestamp() });
+      delete data.id;
       if (isNew) {
         await addDoc(colRef, data);
       } else {
@@ -630,6 +639,7 @@ class FirestoreService {
     const path = 'purchase_orders';
     try {
       const data = cleanUndefined({ ...order, client_id: client.id });
+      delete data.id;
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -663,6 +673,7 @@ class FirestoreService {
         clientId: client.id,
         createdAt: action.createdAt || new Date().toISOString()
       });
+      delete data.id;
       
       if (!action.id) {
         await addDoc(collection(db, path), data);
