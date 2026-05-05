@@ -371,9 +371,36 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     }
   };
 
+  const formatCustomerPayments = (cust: any) => {
+    const pm = cust.paymentMethods;
+    if (!pm) return '-';
+    let parts: string[] = [];
+    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''}`.trim());
+    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''}`.trim());
+    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''}`.trim());
+    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''}`.trim());
+    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''}`.trim());
+    
+    return parts.join(' | ').trim() || '-';
+  };
+
+  const formatCentralPayments = (cust: Customer) => {
+    const pm = cust.paymentMethodsCentral;
+    if (!pm) return '-';
+    let parts: string[] = [];
+    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''}`.trim());
+    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''}`.trim());
+    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''}`.trim());
+    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''}`.trim());
+    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''}`.trim());
+    
+    return parts.join(' | ').trim() || '-';
+  };
+
   const handleExportContractPDF = async (cust: Customer) => {
     const doc = new jsPDF();
-    const { margin } = PDF_CONFIG;
+    const { margin, primaryColor, secondaryColor } = PDF_CONFIG;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
     let docNum = `CTR-PENDING`;
     try {
@@ -383,41 +410,139 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
       console.error("Error generating contract doc number:", err);
     }
     
-    // Standard Header
-    const startY = applyStandardHeader(
-      doc, 
-      "CONTRATTO DI SERVIZIO", 
-      cust.name, 
-      docNum, 
-      adminProfile
-    );
+    // Custom Header for Contract
+    // 1. Logo EB-Pro (Left)
+    const logoY = 15;
+    const logoAreaWidth = 40;
+    
+    if (adminProfile?.logoUrl) {
+        try {
+            doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, logoAreaWidth, 20);
+        } catch (e) {
+            doc.setFontSize(14);
+            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.text("EB-PRO", margin, logoY + 12);
+        }
+    } else {
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("EB-PRO", margin, logoY + 12);
+    }
 
+    // 2. Company Details (Next to Logo)
+    doc.setFontSize(8);
+    doc.setTextColor(secondaryColor[0]);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    const detailsX = margin + logoAreaWidth + 5;
+    doc.text([
+        adminProfile?.companyName || "EB-Pro Centrale Acquisti",
+        `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
+        `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
+        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`
+    ], detailsX, logoY + 5);
+
+    // 3. Document Title
+    const titleY = logoY + 35;
+    doc.setFontSize(22);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    const titleText = "CONTRATTO DI SERVIZIO";
+    doc.text(titleText, pageWidth - margin - doc.getTextWidth(titleText), titleY);
+    
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.1);
+    doc.line(pageWidth - margin - doc.getTextWidth(titleText), titleY + 2, pageWidth - margin, titleY + 2);
+
+    // 4. Info Block
+    const infoY = titleY + 15;
+    doc.setFontSize(10);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(secondaryColor[0]);
+    doc.text(`Documento N.: ${docNum}`, pageWidth - margin - doc.getTextWidth(`Documento N.: ${docNum}`), infoY);
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, pageWidth - margin - doc.getTextWidth(`Data: ${new Date().toLocaleDateString('it-IT')}`), infoY + 6);
+    doc.text(`Destinatario: ${cust.name}`, pageWidth - margin - doc.getTextWidth(`Destinatario: ${cust.name}`), infoY + 12);
+
+    const startY = infoY + 30;
     doc.setFontSize(14);
+    doc.setTextColor(50, 50, 50);
     doc.text("Oggetto: Fornitura Servizi di Centrale Acquisti", margin, startY);
 
-    const bodyText = `
-Il presente contratto regola la fornitura dei servizi tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il cliente ${cust.name}.
-
-Dettagli Cliente:
-- P.IVA: ${cust.vatNumber}
-- Indirizzo: ${cust.address}
-- Pagamento: ${cust.paymentTerms}
-
-Validità:
-- Dal: ${cust.contractStartDate || 'N.D.'}
-- Al: ${cust.contractEndDate || 'N.D.'}
-- Canone Mensile: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'}
-
-Termini Generali:
-I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l'analisi della spesa.
-    `;
-
     doc.setFontSize(10);
-    const splitText = doc.splitTextToSize(bodyText, doc.internal.pageSize.width - (margin * 2));
-    doc.text(splitText, margin, startY + 15);
+    let currentY = startY + 15;
 
-    applyStandardSignature(doc, startY + 110, adminProfile, "Firma per Accettazione Cliente");
-    applyPageFooter(doc, "MOD-CTR-01 REV. 00", adminProfile);
+    // Body text
+    const introText = `Il presente contratto regola la fornitura dei servizi tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il cliente ${cust.name}.`;
+    doc.text(introText, margin, currentY);
+    currentY += 10;
+
+    // Customer Details
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Dettagli Cliente:", margin, currentY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    currentY += 6;
+    doc.text(`- P.IVA: ${cust.vatNumber}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Indirizzo: ${cust.address}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Pagamento vs Centrale Acquisti: ${formatCentralPayments(cust)}`, margin + 5, currentY);
+    currentY += 10;
+
+    // Validity
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Validità e Quote:", margin, currentY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    currentY += 6;
+    doc.text(`- Dal: ${cust.contractStartDate || 'N.D.'}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Al: ${cust.contractEndDate || 'N.D.'}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Canone Mensile: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'} (esclusa IVA)`, margin + 5, currentY);
+    currentY += 10;
+
+    // General Terms
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Termini Generali:", margin, currentY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    currentY += 6;
+    
+    const terms = [
+        "L'accesso alla piattaforma EB-Pro è esclusivo diritto della centrale acquisti.",
+        "Per tutta la durata del contratto il cliente paga la fee mensile per:",
+        "a. affidare la completa gestione dei suoi acquisti alla centrale acquisti EB-Pro in regime di esclusiva.",
+        "b. ottenere grazie alla centrale acquisti EB-Pro vantaggi di saving, di ottimizzazione della spesa.",
+        "c. ottenere grazie alla centrale acquisti EB-Pro vantaggi di ottimizzazione delle scorte.",
+        "d. ottenere grazie alla centrale acquisti EB-Pro vantaggi di miglioramento quali-quantitativo dei beni/prodotti/servizi acquistati/da acquistare.",
+        "e. ricevere dalla centrale acquisti EB-Pro report periodici (a seconda di quanto concordato) sugli aspetti legati ai vantaggi."
+    ];
+
+    terms.forEach(line => {
+        const splitLine = doc.splitTextToSize(line, doc.internal.pageSize.width - (margin * 2) - 10);
+        doc.text(splitLine, margin + 5, currentY);
+        currentY += (splitLine.length * 5);
+    });
+
+    // Signature Area
+    const signatureY = 240;
+    
+    // Left: EB-Pro
+    doc.setFontSize(10);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("EB-Pro Centrale Acquisti", margin, signatureY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.text("L'Amministratore Unico", margin, signatureY + 5);
+    doc.text("Vito Loiudice", margin, signatureY + 10);
+    doc.line(margin, signatureY + 25, margin + 60, signatureY + 25);
+
+    // Right: Customer
+    const rightX = pageWidth - margin - 60;
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Timbro e Firma Cliente", rightX, signatureY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.text(cust.name, rightX, signatureY + 5);
+    doc.text("L'Amministratore", rightX, signatureY + 10);
+    doc.line(rightX, signatureY + 25, pageWidth - margin, signatureY + 25);
+
+    applyPageFooter(doc, "MOD-CTR-01 REV. 01", adminProfile);
 
     // PERSISTENCE & BACKUP
     try {
@@ -435,6 +560,161 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
     }
 
     doc.save(`Contratto_${cust.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  };
+
+  const handleExportSupplierPDF = async (sup: Supplier) => {
+    const doc = new jsPDF();
+    const { margin, primaryColor, secondaryColor } = PDF_CONFIG;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    let docNum = `CTR-SUP-PENDING`;
+    try {
+      const nextNum = await getNextDocumentNumber('REPORT_ANALYTICS');
+      docNum = `SUP-${nextNum}`;
+    } catch (err) {
+      console.error("Error generating supplier contract doc number:", err);
+    }
+    
+    // Custom Header for Contract
+    // 1. Logo EB-Pro (Left)
+    const logoY = 15;
+    const logoAreaWidth = 40;
+    
+    if (adminProfile?.logoUrl) {
+        try {
+            doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, logoAreaWidth, 20);
+        } catch (e) {
+            doc.setFontSize(14);
+            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+            doc.text("EB-PRO", margin, logoY + 12);
+        }
+    } else {
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("EB-PRO", margin, logoY + 12);
+    }
+
+    // 2. Company Details (Next to Logo)
+    doc.setFontSize(8);
+    doc.setTextColor(secondaryColor[0]);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    const detailsX = margin + logoAreaWidth + 5;
+    doc.text([
+        adminProfile?.companyName || "EB-Pro Centrale Acquisti",
+        `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
+        `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
+        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`
+    ], detailsX, logoY + 5);
+
+    // 3. Document Title
+    const titleY = logoY + 35;
+    doc.setFontSize(22);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    const titleText = "ACCORDO DI FORNITURA";
+    doc.text(titleText, pageWidth - margin - doc.getTextWidth(titleText), titleY);
+    
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.1);
+    doc.line(pageWidth - margin - doc.getTextWidth(titleText), titleY + 2, pageWidth - margin, titleY + 2);
+
+    // 4. Info Block
+    const infoY = titleY + 15;
+    doc.setFontSize(10);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(secondaryColor[0]);
+    doc.text(`Documento N.: ${docNum}`, pageWidth - margin - doc.getTextWidth(`Documento N.: ${docNum}`), infoY);
+    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, pageWidth - margin - doc.getTextWidth(`Data: ${new Date().toLocaleDateString('it-IT')}`), infoY + 6);
+    doc.text(`Fornitore: ${sup.name}`, pageWidth - margin - doc.getTextWidth(`Fornitore: ${sup.name}`), infoY + 12);
+
+    const startY = infoY + 30;
+    doc.setFontSize(14);
+    doc.setTextColor(50, 50, 50);
+    doc.text("Oggetto: Partnership per la Fornitura Centralizzata", margin, startY);
+
+    doc.setFontSize(10);
+    let currentY = startY + 15;
+
+    // Body text
+    const introText = `Il presente accordo costituisce l'oggetto della collaborazione tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il fornitore ${sup.name} al fine di raggiungere obiettivi di reciproco vantaggio.`;
+    const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
+    doc.text(splitIntro, margin, currentY);
+    currentY += (splitIntro.length * 6);
+
+    // Supplier Details
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Dettagli Fornitore:", margin, currentY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    currentY += 6;
+    doc.text(`- Ragione Sociale: ${sup.name}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Email: ${sup.email}`, margin + 5, currentY);
+    currentY += 5;
+    doc.text(`- Termini di Pagamento: ${sup.paymentTerms}`, margin + 5, currentY);
+    currentY += 10;
+
+    // General Terms
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Termini e Condizioni di Partnership:", margin, currentY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    currentY += 6;
+    
+    const terms = [
+        "Il Fornitore si impegna a garantire la massima priorità nell'evasione degli ordini pervenuti tramite la Centrale Acquisti EB-Pro.",
+        "Il Fornitore si impegna ad applicare ai Clienti Finali le migliori condizioni economiche e di servizio target concordate attraverso la Centrale Acquisti.",
+        "Il Fornitore collaborerà attivamente per il monitoraggio e l'ottimizzazione dei livelli di scorte e per garantire la continuità del servizio.",
+        "È fatto obbligo al Fornitore di fornire report periodici sulle performance di fornitura e sui livelli di servizio (SLA) raggiunti.",
+        "Il Fornitore parteciperà attivamente alle iniziative di saving e di miglioramento quali-quantitativo promosse dalla Centrale Acquisti.",
+        "La Centrale Acquisti garantisce al Fornitore la visibilità dei fabbisogni e canali privilegiati per la negoziazione centralizzata."
+    ];
+
+    terms.forEach(line => {
+        const splitLine = doc.splitTextToSize(line, doc.internal.pageSize.width - (margin * 2) - 10);
+        doc.setLineWidth(0.05);
+        doc.text("•", margin + 2, currentY);
+        doc.text(splitLine, margin + 5, currentY);
+        currentY += (splitLine.length * 5) + 2;
+    });
+
+    // Signature Area
+    const signatureY = 240;
+    
+    // Left: EB-Pro
+    doc.setFontSize(10);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("EB-Pro Centrale Acquisti", margin, signatureY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.text("L'Amministratore Unico", margin, signatureY + 5);
+    doc.text("Vito Loiudice", margin, signatureY + 10);
+    doc.line(margin, signatureY + 25, margin + 60, signatureY + 25);
+
+    // Right: Supplier
+    const rightX = pageWidth - margin - 60;
+    doc.setFont(doc.getFont().fontName, 'bold');
+    doc.text("Timbro e Firma Fornitore", rightX, signatureY);
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.text(sup.name, rightX, signatureY + 5);
+    doc.text("L'Amministratore", rightX, signatureY + 10);
+    doc.line(rightX, signatureY + 25, pageWidth - margin, signatureY + 25);
+
+    applyPageFooter(doc, "MOD-FOR-01 REV. 01", adminProfile);
+
+    // PERSISTENCE & BACKUP
+    try {
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      await persistGeneratedDocument({
+        doc_tipo: 'REPORT_ANALYTICS',
+        doc_num: docNum,
+        doc_data: new Date().toISOString(),
+        doc_ref_id: sup.id,
+        doc_ref_type: 'SUPPLIER',
+        pdf_backup_url: pdfBase64
+      });
+    } catch (err) {
+      console.error("Failed to backup Supplier Contract PDF:", err);
+    }
+
+    doc.save(`Accordo_Fornitore_${sup.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   const handleExportInvoicePDF = async (cust: Customer) => {
@@ -559,7 +839,7 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                           <th className="p-4">Cliente</th>
                           <th className="p-4 hidden sm:table-cell">P.IVA</th>
                           <th className="p-4 hidden md:table-cell">Email</th>
-                          <th className="p-4">Zona</th>
+                          <th className="p-4">Stato</th>
                           <th className="p-4 hidden lg:table-cell">Pagamento</th>
                        </>
                   )}
@@ -627,12 +907,22 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                     <td className="p-4 hidden md:table-cell text-slate-600 text-xs truncate max-w-[150px]">{sup.email}</td>
                     <td className="p-4 hidden lg:table-cell text-slate-500 text-xs whitespace-nowrap">{sup.paymentTerms}</td>
                     <td className="p-4 text-center">
-                      <button 
-                        onClick={() => handleEdit(sup)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                      </button>
+                      <div className="flex justify-center gap-1">
+                        <button 
+                            onClick={() => handleExportSupplierPDF(sup)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Contratto"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </button>
+                        <button 
+                            onClick={() => handleEdit(sup)}
+                            className="p-1.5 text-slate-600 hover:bg-slate-50 rounded transition-colors"
+                            title="Modifica"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -645,8 +935,8 @@ I servizi includono l'accesso alla piattaforma EB-pro, la gestione fornitori e l
                     </td>
                     <td className="p-4 hidden sm:table-cell font-mono text-[10px] text-slate-500">{cust.vatNumber}</td>
                     <td className="p-4 hidden md:table-cell text-blue-600 text-xs truncate max-w-[120px]">{cust.email}</td>
-                    <td className="p-4 text-slate-600 text-xs font-bold uppercase tracking-tighter">{cust.region}</td>
-                    <td className="p-4 hidden lg:table-cell text-slate-500 text-xs">{cust.paymentTerms}</td>
+                    <td className="p-4 text-slate-600 text-xs font-bold uppercase tracking-tighter">{cust.region}{cust.province ? ` (${cust.province})` : ''}</td>
+                    <td className="p-4 hidden lg:table-cell text-slate-500 text-xs">{formatCustomerPayments(cust)}</td>
                     <td className="p-4 text-center">
                       <div className="flex justify-center gap-1">
                         <button 
