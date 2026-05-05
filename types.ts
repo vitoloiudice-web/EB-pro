@@ -216,11 +216,40 @@ export interface Supplier {
 export interface Customer {
   id: string;
   name: string;
-  email: string;
   vatNumber: string; // Partita IVA
+  region: string; // Stato / Regione
+  province?: string;
+  zipCode?: string;
+  city?: string;
   address: string;
-  region: string;
-  paymentTerms: string;
+  email: string; // Email generica
+  adminEmail?: string;
+  techEmail?: string; // Email Uff. Tecnico
+  salesEmail?: string; // Email Uff. Commerciale
+  warehouseEmail?: string; // Email Magazzino
+  phone?: string;
+  adminPhone?: string;
+  techPhone?: string; // TEL. UFF. TECNICO
+  salesPhone?: string; // TEL. UFF. COMMERCIALE
+  warehousePhone?: string; // TEL. MAGAZZINO
+
+  // Condizioni Pagamento
+  paymentMethods?: {
+    riba?: { enabled: boolean; description: string; terms?: string[] };
+    bb?: { enabled: boolean; description: string; terms?: string[] };
+    rd?: { enabled: boolean; description: string; terms?: string[] };
+    titoli?: { enabled: boolean; description: string; terms?: string[] };
+    altro?: { enabled: boolean; description: string; customLabel?: string; terms?: string[] };
+  };
+  paymentMethodsCentral?: {
+    riba?: { enabled: boolean; description: string; terms?: string[] };
+    bb?: { enabled: boolean; description: string; terms?: string[] };
+    rd?: { enabled: boolean; description: string; terms?: string[] };
+    titoli?: { enabled: boolean; description: string; terms?: string[] };
+    altro?: { enabled: boolean; description: string; customLabel?: string; terms?: string[] };
+  };
+
+  paymentTerms: string; // Legacy
   // Service Contract Fields
   monthlyFee?: number;
   contractStartDate?: string;

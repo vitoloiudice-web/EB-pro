@@ -1080,7 +1080,26 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setFormData({ ...initialData });
+        let dataToSet = { ...initialData };
+        if (type === 'CUSTOMERS') {
+            dataToSet.paymentMethods = {
+                riba: { enabled: false, description: '' },
+                bb: { enabled: false, description: '' },
+                rd: { enabled: false, description: '' },
+                titoli: { enabled: false, description: '' },
+                altro: { enabled: false, description: '', customLabel: '' },
+                ...(initialData.paymentMethods || {})
+            };
+            dataToSet.paymentMethodsCentral = {
+                riba: { enabled: false, description: '' },
+                bb: { enabled: false, description: '' },
+                rd: { enabled: false, description: '' },
+                titoli: { enabled: false, description: '' },
+                altro: { enabled: false, description: '', customLabel: '' },
+                ...(initialData.paymentMethodsCentral || {})
+            };
+        }
+        setFormData(dataToSet);
       } else {
         // Reset form for creation based on type
         const defaults = type === 'ITEMS' 
@@ -1127,7 +1146,29 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
                 warehouse: { email: '', phone: '', street: '', number: '', zip: '', city: '', province: '' }
               }
             }
-          : { name: '', vatNumber: '', email: '', region: '', paymentTerms: '', monthlyFee: 0, contractStartDate: '', contractEndDate: '' };
+          : type === 'CUSTOMERS' ? { 
+              name: '', vatNumber: '', email: '', adminEmail: '',
+              techEmail: '', salesEmail: '', warehouseEmail: '',
+              region: '', province: '', zipCode: '', city: '', address: '',
+              phone: '', adminPhone: '', techPhone: '', salesPhone: '', warehousePhone: '',
+              paymentTerms: '',
+              paymentMethods: {
+                riba: { enabled: false, description: '' },
+                bb: { enabled: false, description: '' },
+                rd: { enabled: false, description: '' },
+                titoli: { enabled: false, description: '' },
+                altro: { enabled: false, description: '', customLabel: '' }
+              },
+              paymentMethodsCentral: {
+                riba: { enabled: false, description: '' },
+                bb: { enabled: false, description: '' },
+                rd: { enabled: false, description: '' },
+                titoli: { enabled: false, description: '' },
+                altro: { enabled: false, description: '', customLabel: '' }
+              },
+              monthlyFee: 0, contractStartDate: '', contractEndDate: ''
+            }
+          : { name: '', logoUrl: '' };
         setFormData(defaults);
 
         // Auto-generate ID for suppliers
@@ -1156,9 +1197,95 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
       setError("Il nome/ragione sociale è obbligatorio.");
       return;
     }
+
+    if (type === 'CUSTOMERS') {
+        const pm = formData.paymentMethods || {};
+        const hasPm = pm.riba?.enabled || pm.bb?.enabled || pm.rd?.enabled || pm.titoli?.enabled || pm.altro?.enabled;
+        
+        const pmc = formData.paymentMethodsCentral || {};
+        const hasPmc = pmc.riba?.enabled || pmc.bb?.enabled || pmc.rd?.enabled || pmc.titoli?.enabled || pmc.altro?.enabled;
+
+        if (!hasPm) {
+            setError("Selezionare almeno una Condizione di Pagamento vs. Fornitori.");
+            return;
+        }
+        if (!hasPmc) {
+            setError("Selezionare almeno una Condizione di Pagamento vs. Centrale Acquisti.");
+            return;
+        }
+    }
+
     setError(null);
     onSave(formData);
     onClose();
+  };
+
+  const AVAILABLE_TERMS = ['A VISTA', '30 GG', '60 GG', '90 GG', '120 GG', '180 GG'];
+
+  const renderPaymentMethodRow = (fieldGroup: 'paymentMethods' | 'paymentMethodsCentral', methodKey: 'riba' | 'bb' | 'rd' | 'titoli' | 'altro', label: string) => {
+      const data = formData[fieldGroup]?.[methodKey] || { enabled: false, description: '', terms: [] };
+      const isAltro = methodKey === 'altro';
+
+      return (
+          <div className="flex flex-col sm:flex-row items-start gap-3 mt-4">
+              <div className="flex items-center gap-3 pt-2 w-full sm:w-32 shrink-0">
+                  <input type="checkbox" className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" 
+                      checked={data.enabled}
+                      onChange={(e) => {
+                          const newMethods = { ...(formData[fieldGroup] || {}) };
+                          newMethods[methodKey] = { ...data, enabled: e.target.checked };
+                          handleChange(fieldGroup, newMethods);
+                      }}
+                  />
+                  <div className="font-bold text-slate-600">{label}</div>
+              </div>
+
+              <div className="flex-1 w-full space-y-2">
+                  {isAltro && (
+                      <input type="text" className="neu-input w-full px-3 py-1.5 text-sm" placeholder="Descrizione metodo di pagamento (es. Carta di Credito)..." 
+                          disabled={!data.enabled}
+                          value={data.customLabel || ''}
+                          onChange={(e) => {
+                              const newMethods = { ...(formData[fieldGroup] || {}) };
+                              newMethods[methodKey] = { ...data, customLabel: e.target.value };
+                              handleChange(fieldGroup, newMethods);
+                          }}
+                      />
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2 items-center">
+                      {AVAILABLE_TERMS.map(term => (
+                          <label key={term} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${data.enabled ? 'hover:bg-slate-50' : 'opacity-50 cursor-not-allowed'} ${data.terms?.includes(term) ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-bold shadow-sm' : 'border-slate-200 text-slate-600'}`}>
+                              <input type="checkbox" className="hidden" 
+                                  disabled={!data.enabled}
+                                  checked={data.terms?.includes(term) || false}
+                                  onChange={(e) => {
+                                      const newTerms = e.target.checked 
+                                          ? [...(data.terms || []), term]
+                                          : (data.terms || []).filter((t: string) => t !== term);
+                                      
+                                      const newMethods = { ...(formData[fieldGroup] || {}) };
+                                      newMethods[methodKey] = { ...data, terms: newTerms };
+                                      handleChange(fieldGroup, newMethods);
+                                  }}
+                              />
+                              {term}
+                          </label>
+                      ))}
+                  </div>
+
+                  <input type="text" className="neu-input w-full px-3 py-1.5 text-sm" placeholder={isAltro ? "Termini descrittivi aggiuntivi e testo libero..." : "Campi descrittivi aggiuntivi (es. DF, FM)..."} 
+                      disabled={!data.enabled}
+                      value={data.description || ''}
+                      onChange={(e) => {
+                          const newMethods = { ...(formData[fieldGroup] || {}) };
+                          newMethods[methodKey] = { ...data, description: e.target.value };
+                          handleChange(fieldGroup, newMethods);
+                      }}
+                  />
+              </div>
+          </div>
+      );
   };
 
   return (
@@ -1217,23 +1344,63 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
                     /* LEGACY SIMPLE FORMS FOR CUSTOMERS */
                     <div className="p-2 overflow-y-auto custom-scrollbar">
                         {type === 'CUSTOMERS' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="col-span-1 sm:col-span-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3">
                                 <InputGroup label="Ragione Sociale" value={formData.name} onChange={(val) => handleChange('name', val)} />
                             </div>
+                            
                             <InputGroup label="Partita IVA" value={formData.vatNumber} onChange={(val) => handleChange('vatNumber', val)} />
-                            <InputGroup label="Zona / Regione" value={formData.region} onChange={(val) => handleChange('region', val)} />
-                            <InputGroup label="Email Amministrazione" value={formData.email} onChange={(val) => handleChange('email', val)} type="email" />
-                            <InputGroup label="Indirizzo Sede" value={formData.address} onChange={(val) => handleChange('address', val)} />
-                            <div className="col-span-1 sm:col-span-2">
-                                <InputGroup label="Condizioni Pagamento" value={formData.paymentTerms} onChange={(val) => handleChange('paymentTerms', val)} />
+                            <InputGroup label="Regione / Stato" value={formData.region} onChange={(val) => handleChange('region', val)} />
+                            <InputGroup label="Provincia" value={formData.province} onChange={(val) => handleChange('province', val)} />
+                            
+                            <InputGroup label="Comune" value={formData.city} onChange={(val) => handleChange('city', val)} />
+                            <InputGroup label="CAP" value={formData.zipCode} onChange={(val) => handleChange('zipCode', val)} />
+                            <InputGroup label="Indirizzo (Via/Piazza, Civico)" value={formData.address} onChange={(val) => handleChange('address', val)} />
+
+                            <InputGroup label="Email Generica" value={formData.email} onChange={(val) => handleChange('email', val)} type="email" />
+                            <InputGroup label="Email Amministrazione" value={formData.adminEmail} onChange={(val) => handleChange('adminEmail', val)} type="email" />
+                            <InputGroup label="Email Uff. Tecnico" value={formData.techEmail} onChange={(val) => handleChange('techEmail', val)} type="email" />
+                            
+                            <InputGroup label="Email Uff. Commerciale" value={formData.salesEmail} onChange={(val) => handleChange('salesEmail', val)} type="email" />
+                            <InputGroup label="Email Magazzino" value={formData.warehouseEmail} onChange={(val) => handleChange('warehouseEmail', val)} type="email" />
+                            <div className="hidden lg:block"></div> {/* Spacer */}
+
+                            <InputGroup label="Telefono Principale" value={formData.phone} onChange={(val) => handleChange('phone', val)} />
+                            <InputGroup label="Telefono Amministrazione" value={formData.adminPhone} onChange={(val) => handleChange('adminPhone', val)} />
+                            <InputGroup label="Telefono Uff. Tecnico" value={formData.techPhone} onChange={(val) => handleChange('techPhone', val)} />
+
+                            <InputGroup label="Telefono Uff. Commerciale" value={formData.salesPhone} onChange={(val) => handleChange('salesPhone', val)} />
+                            <InputGroup label="Telefono Magazzino" value={formData.warehousePhone} onChange={(val) => handleChange('warehousePhone', val)} />
+                            <div className="hidden lg:block"></div> {/* Spacer */}
+
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
+                                <h4 className="text-sm font-bold text-slate-700 mb-4">Condizioni Pagamento vs. Fornitori</h4>
+                                <div className="space-y-4">
+                                    {renderPaymentMethodRow('paymentMethods', 'riba', 'Ri.Ba')}
+                                    {renderPaymentMethodRow('paymentMethods', 'bb', 'Bonifico (BB)')}
+                                    {renderPaymentMethodRow('paymentMethods', 'rd', 'Rim. Diretta')}
+                                    {renderPaymentMethodRow('paymentMethods', 'titoli', 'Titoli (Ass.)')}
+                                    {renderPaymentMethodRow('paymentMethods', 'altro', 'Altro')}
+                                </div>
                             </div>
-                            <div className="col-span-1 sm:col-span-2 mt-4 border-t border-slate-200 pt-4">
+
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
                                 <h4 className="text-sm font-bold text-slate-700 mb-4">Contratto di Servizio (Centrale Acquisti)</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <InputGroup label="Fee Mensile (€)" value={formData.monthlyFee} onChange={(val) => handleChange('monthlyFee', val)} type="number" />
                                     <InputGroup label="Data Inizio Contratto" value={formData.contractStartDate} onChange={(val) => handleChange('contractStartDate', val)} type="date" />
                                     <InputGroup label="Data Fine Contratto" value={formData.contractEndDate} onChange={(val) => handleChange('contractEndDate', val)} type="date" />
+                                </div>
+                            </div>
+                            
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
+                                <h4 className="text-sm font-bold text-slate-700 mb-4">Condizioni Pagamento vs. Centrale Acquisti</h4>
+                                <div className="space-y-4">
+                                    {renderPaymentMethodRow('paymentMethodsCentral', 'riba', 'Ri.Ba')}
+                                    {renderPaymentMethodRow('paymentMethodsCentral', 'bb', 'Bonifico (BB)')}
+                                    {renderPaymentMethodRow('paymentMethodsCentral', 'rd', 'Rim. Diretta')}
+                                    {renderPaymentMethodRow('paymentMethodsCentral', 'titoli', 'Titoli (Ass.)')}
+                                    {renderPaymentMethodRow('paymentMethodsCentral', 'altro', 'Altro')}
                                 </div>
                             </div>
                         </div>
