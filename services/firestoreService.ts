@@ -81,6 +81,19 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+function cleanUndefined(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefined).filter(v => v !== undefined);
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, cleanUndefined(v)])
+    );
+  }
+  return obj;
+}
+
 class FirestoreService {
   // --- ITEMS ---
   public async getItems(client: Client, page: number = 1, pageSize: number = 20, search: string = '', filters: any = {}): Promise<PaginatedResponse<Item>> {
@@ -141,12 +154,12 @@ class FirestoreService {
     if (!client) throw new Error("Client is required to save item");
     const path = 'items';
     try {
-      const data = {
+      const data = cleanUndefined({
         ...item,
         client_id: client.id,
         updated_at: serverTimestamp(),
         created_at: isNew ? serverTimestamp() : (item as any).created_at || serverTimestamp()
-      };
+      });
       
       if (isNew) {
         // Enforce absolute uniqueness of SKU
@@ -223,7 +236,7 @@ class FirestoreService {
     if (!client) throw new Error("Client is required to save supplier");
     const path = 'suppliers';
     try {
-      const data = { ...supplier, client_id: client.id, created_at: serverTimestamp() };
+      const data = cleanUndefined({ ...supplier, client_id: client.id, created_at: serverTimestamp() });
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -269,7 +282,7 @@ class FirestoreService {
     if (!client) throw new Error("Client is required to save customer");
     const path = 'customers';
     try {
-      const data = { ...customer, client_id: client.id, created_at: serverTimestamp() };
+      const data = cleanUndefined({ ...customer, client_id: client.id, created_at: serverTimestamp() });
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -331,7 +344,7 @@ class FirestoreService {
     if (!client) throw new Error("Client is required to save budget");
     const path = 'budgets';
     try {
-      const data = { ...budget, client_id: client.id, updatedAt: new Date().toISOString() };
+      const data = cleanUndefined({ ...budget, client_id: client.id, updatedAt: new Date().toISOString() });
       
       // If we are creating, set initial amounts
       if (isNew) {
@@ -407,7 +420,7 @@ class FirestoreService {
     const path = `clients/${client.id}/qualificationCriteria`;
     try {
       const colRef = collection(db, 'clients', client.id, 'qualificationCriteria');
-      const data = { ...criterion, updated_at: serverTimestamp() };
+      const data = cleanUndefined({ ...criterion, updated_at: serverTimestamp() });
       if (isNew) {
         await addDoc(colRef, data);
       } else {
@@ -616,7 +629,7 @@ class FirestoreService {
     if (!client) throw new Error("Client is required to save order");
     const path = 'purchase_orders';
     try {
-      const data = { ...order, client_id: client.id };
+      const data = cleanUndefined({ ...order, client_id: client.id });
       if (isNew) {
         await addDoc(collection(db, path), data);
       } else {
@@ -645,11 +658,11 @@ class FirestoreService {
     if (!client) throw new Error("Client is required");
     const path = `saving_actions`;
     try {
-      const data = {
+      const data = cleanUndefined({
         ...action,
         clientId: client.id,
         createdAt: action.createdAt || new Date().toISOString()
-      };
+      });
       
       if (!action.id) {
         await addDoc(collection(db, path), data);
