@@ -16,14 +16,17 @@ Documento consolidato evoluzione ERP "EB-pro" (Easy Buy procurement).
 - **17/04:** Workflow Budget. Salvataggio Firestore (`APPROVED`/`PENDING`). Generazione PDF Contratti/Richieste e invio email automatico.
 - **21/04 (Fase Stabilità):** Fix focus input in `AdminProfileView`. Isolamento Sandbox con `SessionStorage`. Fix PWA (Service Worker, Manifest Mobile) e routing fallback Express.
 - **27/04:** Mappatura Macrofamiglie/Famiglie dinamica. Migrazione Auth da Google a Email/Password. Sincronizzazione dati Prod -> Sandbox. Gestione limiti Firestore (taglio PDF > 1MB).
-
 ### Maggio 2026: Automazione e Raffinatezza
 - **02/05 (Bulk & AI):** Import/Export Excel con controllo anti-duplicato (SKU/Ragione Sociale). **Smart Import AI**: Analisi datasheet PDF/Immagini via Gemini per pre-compilazione anagrafica.
-- **05/05 (Data Integrity & PDF):** 
-  - Fix bug Firestore (eliminazione `id: undefined` e protezione `serverTimestamp`). 
-  - Normalizzazione input: Regione/Stato a 3 lettere (ITA), Province MAIUSCOLE, numeri Telefono con prefisso +39 automatico.
-  - Layout Contratti Prof: Logo EB-Pro, dettagli fiscali Centrale Acquisti, clausole gestione esclusiva e firmatari contrapposti (Vito Loiudice vs Partner).
-  - Raffinamento rendering Clienti: Concatenazione Stato/Provincia e formattazione dinamica stringa pagamenti.
+- **05/05 (Persistence & Layout):** 
+  - Fix persistenza Sandbox via `localStorage` (evita reset su refresh).
+  - Fix bug refresh `usePaginatedData` su cambio Tab/Ambiente.
+  - Fix bug Firestore (eliminazione `id: undefined` e protezione `serverTimestamp`).
+  - Normalizzazione input (Regione ITA, Prov MAIUSCOLE, Tel +39).
+  - Raffinamento PDF: Logo EB-Pro, Dati fiscali e Regime (Split Payment) in header.
+  - Raffinamento Contratti: Clausole esclusiva/saving e Firmatari (Vito Loiudice vs Partner).
+  - Estensione layout Contratti ai Fornitori (Reciproco Vantaggio).
+  - Consolidamento documentazione (.md).
 
 ## 3. Stato Attuale
 - [x] CRUD Firestore stabile (Anagrafiche, Documenti, Budget).

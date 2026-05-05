@@ -431,15 +431,19 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
 
     // 2. Company Details (Next to Logo)
     doc.setFontSize(8);
-    doc.setTextColor(secondaryColor[0]);
-    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(50, 50, 50);
+    doc.setFont(doc.getFont().fontName, 'bold');
     const detailsX = margin + logoAreaWidth + 5;
+    doc.text(adminProfile?.companyName || "EB-Pro Centrale Acquisti", detailsX, logoY + 5);
+    
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(secondaryColor[0]);
     doc.text([
-        adminProfile?.companyName || "EB-Pro Centrale Acquisti",
         `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
         `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
-        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`
-    ], detailsX, logoY + 5);
+        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
+        `Regime Fiscale: Ordinario / Split Payment`
+    ], detailsX, logoY + 10);
 
     // 3. Document Title
     const titleY = logoY + 35;
@@ -596,15 +600,19 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
 
     // 2. Company Details (Next to Logo)
     doc.setFontSize(8);
-    doc.setTextColor(secondaryColor[0]);
-    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(50, 50, 50);
+    doc.setFont(doc.getFont().fontName, 'bold');
     const detailsX = margin + logoAreaWidth + 5;
+    doc.text(adminProfile?.companyName || "EB-Pro Centrale Acquisti", detailsX, logoY + 5);
+    
+    doc.setFont(doc.getFont().fontName, 'normal');
+    doc.setTextColor(secondaryColor[0]);
     doc.text([
-        adminProfile?.companyName || "EB-Pro Centrale Acquisti",
         `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
         `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
-        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`
-    ], detailsX, logoY + 5);
+        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
+        `Regime Fiscale: Ordinario / Split Payment`
+    ], detailsX, logoY + 10);
 
     // 3. Document Title
     const titleY = logoY + 35;

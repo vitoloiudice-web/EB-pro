@@ -35,15 +35,15 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
   const fetchData = useCallback(async (currentPage: number, currentSearch: string, currentFilters: any, force = false) => {
     const filtersStr = JSON.stringify(currentFilters);
     // Avoid redundant fetches if parameters haven't changed (unless forced)
-    if (!force && lastFetchedRef.current.page === currentPage && lastFetchedRef.current.search === currentSearch && lastFetchedRef.current.filtersStr === filtersStr) {
+    if (!force && lastFetchedRef.current.page === currentPage && lastFetchedRef.current.search === currentSearch && lastFetchedRef.current.filtersStr === filtersStr && lastFetchedRef.current.method === fetchMethod) {
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchMethodRef.current(currentPage, pageSize, currentSearch, currentFilters);
-      lastFetchedRef.current = { page: currentPage, search: currentSearch, filtersStr };
+      const result = await fetchMethod(currentPage, pageSize, currentSearch, currentFilters);
+      lastFetchedRef.current = { page: currentPage, search: currentSearch, filtersStr, method: fetchMethod };
       setData(result.data);
       setTotal(result.total);
     } catch (err: any) {
@@ -54,16 +54,16 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
     } finally {
       setLoading(false);
     }
-  }, [pageSize]);
+  }, [pageSize, fetchMethod]);
 
-  // Effect for Page or Search changes
+  // Effect for Page, Search, Filters or Method changes
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchData(page, search, filters);
     }, search ? 400 : 0);
     
     return () => clearTimeout(timer);
-  }, [page, search, filters, fetchData]);
+  }, [page, search, filters, fetchMethod, fetchData]);
 
   const refresh = useCallback(() => {
     fetchData(page, search, filters, true); // Force refresh

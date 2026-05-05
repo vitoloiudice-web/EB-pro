@@ -142,7 +142,10 @@ const PROD_WORKSPACE: Client = { id: 'centrale-acquisti', name: 'Centrale Acquis
 const SANDBOX_WORKSPACE: Client = { id: 'sandbox-test', name: 'Sandbox (Test)', spreadsheetId: 'default' };
 
 function App() {
-  const [activeWorkspace, setActiveWorkspace] = useState<Client>(PROD_WORKSPACE);
+  const [activeWorkspace, setActiveWorkspace] = useState<Client>(() => {
+    const saved = localStorage.getItem('activeWorkspaceId');
+    return saved === 'sandbox-test' ? SANDBOX_WORKSPACE : PROD_WORKSPACE;
+  });
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -594,6 +597,7 @@ function App() {
                    setActiveWorkspace(w => {
                      const isEnteringSandbox = w.id !== 'sandbox-test';
                      const newWorkspace = isEnteringSandbox ? SANDBOX_WORKSPACE : PROD_WORKSPACE;
+                     localStorage.setItem('activeWorkspaceId', newWorkspace.id);
                      
                      // Update Sandbox Flag for documentService intercept
                      sessionStorage.setItem('isSandbox', String(isEnteringSandbox));

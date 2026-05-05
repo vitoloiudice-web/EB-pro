@@ -33,35 +33,50 @@ export const applyStandardHeader = (
   const logoMaxWidth = 42;
   const logoMaxHeight = 20;
   let finalLogoHeight = logoMaxHeight;
+  let finalLogoWidth = logoMaxWidth;
 
   if (adminProfile?.logoUrl) {
     try {
-      // Get image properties to maintain aspect ratio within 42x20 box
       const imgProps = (doc as any).getImageProperties(adminProfile.logoUrl);
       const ratio = imgProps.width / imgProps.height;
       
-      let finalWidth = logoMaxWidth;
+      finalLogoWidth = logoMaxWidth;
       let finalHeight = logoMaxWidth / ratio;
       
       if (finalHeight > logoMaxHeight) {
         finalHeight = logoMaxHeight;
-        finalWidth = logoMaxHeight * ratio;
+        finalLogoWidth = logoMaxHeight * ratio;
       }
       
       finalLogoHeight = finalHeight;
-      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, finalWidth, finalHeight);
+      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, finalLogoWidth, finalHeight);
     } catch (e) {
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(adminProfile?.companyName || "LOGO", margin, logoY + 5);
+      doc.text(adminProfile?.companyName || "EB-PRO", margin, logoY + 5);
       finalLogoHeight = 5;
+      finalLogoWidth = 15;
     }
   } else {
     doc.setFontSize(10);
     doc.setTextColor(200);
-    doc.text("Logo Aziendale", margin, logoY + 10);
+    doc.text("EB-PRO", margin, logoY + 10);
     finalLogoHeight = 10;
+    finalLogoWidth = 15;
   }
+
+  // 1b. Company Details (Next to Logo)
+  doc.setFontSize(7.5);
+  doc.setTextColor(secondaryColor[0]);
+  doc.setFont(doc.getFont().fontName, 'normal');
+  const detailsX = margin + finalLogoWidth + 5;
+  doc.text([
+      adminProfile?.companyName || "EB-Pro Centrale Acquisti",
+      `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
+      `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
+      `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
+      `Regime Fiscale: Ordinario / Split Payment`
+  ], detailsX, logoY + 3);
 
   // 2. Title - Right Aligned (Positioned BELOW logo with spacing)
   // Gap between bottom of logo and title increased by 3% (from 12 to 12.36)
