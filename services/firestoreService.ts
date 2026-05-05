@@ -267,13 +267,24 @@ class FirestoreService {
     if (!client) return { data: [], total: 0 };
     const path = 'customers';
     try {
-      const q = query(collection(db, path), where('client_id', '==', client.id), limit(pageSize));
+      // Increased limit to 1000 for in-memory filtering to avoid missing duplicates/search results
+      const q = query(collection(db, path), where('client_id', '==', client.id), limit(pageSize && !search ? pageSize : 1000));
       const snapshot = await getDocs(q);
       let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+      
       if (search) {
-        data = data.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+        const s = search.toLowerCase().trim();
+        data = data.filter(c => 
+            c.name.toLowerCase().includes(s) || 
+            (c.vatNumber && c.vatNumber.replace(/\s+/g, '').includes(s.replace(/\s+/g, '')))
+        );
       }
-      return { data, total: data.length };
+
+      const total = data.length;
+      const start = (page - 1) * pageSize;
+      const paginatedData = data.slice(start, start + pageSize);
+
+      return { data: paginatedData, total };
     } catch (error: any) {
       if (error.message && error.message.includes('client is offline')) {
         console.warn('Firestore client is offline. Returning empty data for customers.');

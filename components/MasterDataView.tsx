@@ -90,7 +90,36 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     try {
         const isNew = !editingEntity;
         
-        // 1. Backend Persistance
+        // 1. Anti-Duplicate Check for Customers
+        if (activeMainTab === 'CUSTOMERS' && isNew) {
+            // Check for VAT duplicate
+            const vatResponse = await dataService.getCustomers(client, 1, 10, formData.vatNumber);
+            const duplicateVat = (vatResponse.data as Customer[]).find(c => 
+                c.vatNumber?.replace(/\s+/g, '') === formData.vatNumber?.replace(/\s+/g, '')
+            );
+            
+            if (duplicateVat) {
+                alert(`ATTENZIONE: Partita IVA ${formData.vatNumber} già presente in anagrafica per "${duplicateVat.name}".`);
+                setIsModalOpen(false);
+                setSearch(formData.vatNumber); // Focus on the duplicate
+                return;
+            }
+
+            // Check for Name duplicate
+            const nameResponse = await dataService.getCustomers(client, 1, 10, formData.name);
+            const duplicateName = (nameResponse.data as Customer[]).find(c => 
+                c.name.toLowerCase().trim() === formData.name.toLowerCase().trim()
+            );
+
+            if (duplicateName) {
+                alert(`ATTENZIONE: Ragione Sociale "${formData.name}" già presente in anagrafica.`);
+                setIsModalOpen(false);
+                setSearch(formData.name);
+                return;
+            }
+        }
+
+        // 2. Backend Persistance
         if (activeMainTab === 'ARTICOLI' && activeSubTab === 'ITEMS') {
             await dataService.saveItem(client, { ...formData, id: editingEntity?.id }, isNew);
         } else if (activeMainTab === 'SUPPLIERS') {

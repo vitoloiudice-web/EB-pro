@@ -1393,14 +1393,13 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
                     <div className="p-2 overflow-y-auto custom-scrollbar">
                         {type === 'CUSTOMERS' && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="col-span-1 sm:col-span-2 lg:col-span-3">
+                            <InputGroup label="Partita IVA" value={formData.vatNumber} onChange={(val) => handleChange('vatNumber', val)} />
+                            <div className="col-span-1 sm:col-span-2">
                                 <InputGroup label="Ragione Sociale" value={formData.name} onChange={(val) => handleChange('name', val)} />
                             </div>
                             
-                            <InputGroup label="Partita IVA" value={formData.vatNumber} onChange={(val) => handleChange('vatNumber', val)} />
                             <InputGroup label="Regione / Stato" value={formData.region} onChange={(val) => handleChange('region', val)} />
                             <InputGroup label="Provincia" value={formData.province} onChange={(val) => handleChange('province', val)} />
-                            
                             <InputGroup label="Comune" value={formData.city} onChange={(val) => handleChange('city', val)} />
                             <InputGroup label="CAP" value={formData.zipCode} onChange={(val) => handleChange('zipCode', val)} />
                             <InputGroup label="Indirizzo (Via/Piazza, Civico)" value={formData.address} onChange={(val) => handleChange('address', val)} />
