@@ -14,19 +14,22 @@ import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFI
 import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import SavingsTargetWizard from './SavingsTargetWizard';
 
 interface BIProps {
   client: Client;
 }
 
 const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
-  const [reportType, setReportType] = useState<'PERFORMANCE' | 'QUALITY' | 'FEE_REVENUE' | 'COMMERCIAL' | 'TREND' | 'GOVERNANCE'>('PERFORMANCE');
+  const [reportType, setReportType] = useState<'PERFORMANCE' | 'QUALITY' | 'FEE_REVENUE' | 'COMMERCIAL' | 'TREND' | 'GOVERNANCE' | 'BUDGET' | 'SAVINGS_TRACKER'>('PERFORMANCE');
   const [savingsChartMode, setSavingsChartMode] = useState<'LINE' | 'BAR'>('LINE');
   const [trendTimeframe, setTrendTimeframe] = useState<'1Y' | '3Y' | '5Y' | 'ALL'>('ALL');
   const [generating, setGenerating] = useState(false);
+  const [isSavingsWizardOpen, setSavingsWizardOpen] = useState(false);
 
   // --- DATA ---
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [savingsActions, setSavingsActions] = useState<any[]>([]);
   const [supplierPerformanceData, setSupplierPerformanceData] = useState<any[]>([]);
   const [savingsData, setSavingsData] = useState<any[]>([]);
   const [qualityMatrix, setQualityMatrix] = useState<any[]>([]);
@@ -37,6 +40,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
   const [commercialSavingsData, setCommercialSavingsData] = useState<any[]>([]);
   const [commercialTrendData, setCommercialTrendData] = useState<any[]>([]);
   const [activeCustomers, setActiveCustomers] = useState<any[]>([]);
+  const [budgetAnalyticsData, setBudgetAnalyticsData] = useState<any>({ assigned: 0, spent: 0, modes: [], status: [] });
   const [showCustomers, setShowCustomers] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
@@ -50,11 +54,34 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         const profile = await dataService.getAdminProfile(client);
         if (profile) setAdminProfile(profile as AdminProfile);
 
+        const actions = await dataService.getSavingActions(client);
+        setSavingsActions(actions || []);
+
         const biData = await dataService.getBIData(client);
         if (!biData) return;
 
-        const { suppliers, items, orders, customers = [] } = biData;
+        const { suppliers, items, orders, customers = [], budgets = [] } = biData;
         setAllOrders(orders);
+
+        // Process Budgets
+        const bAssigned = budgets.reduce((acc: number, b: any) => acc + (b.amountAssigned || 0), 0);
+        const bSpent = budgets.reduce((acc: number, b: any) => acc + (b.amountSpent || 0), 0);
+        
+        const modeMap = new Map<string, number>();
+        const statusMap = new Map<string, number>();
+        budgets.forEach((b: any) => {
+          modeMap.set(b.assignmentMode, (modeMap.get(b.assignmentMode) || 0) + 1);
+          statusMap.set(b.status, (statusMap.get(b.status) || 0) + 1);
+        });
+
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+        
+        setBudgetAnalyticsData({
+          assigned: bAssigned,
+          spent: bSpent,
+          modes: Array.from(modeMap.entries()).map(([name, value], idx) => ({ name: name.replace('_', ' '), value, color: COLORS[idx % COLORS.length] })),
+          status: Array.from(statusMap.entries()).map(([name, value], idx) => ({ name, value, color: COLORS[idx % COLORS.length] }))
+        });
 
         // 0. Active Customers
         const today = new Date();
@@ -278,6 +305,76 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
     setTrendData(trendProcessed);
   }, [allOrders, trendTimeframe]);
 
+  const handleGenerateRFQ = async (action: any) => {
+    try {
+        const doc = new jsPDF();
+        const { margin, primaryColor } = PDF_CONFIG;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        let reportId = `RFQ-PENDING`;
+        try {
+            const nextNum = await getNextDocumentNumber('RFQ');
+            reportId = `RFQ-${nextNum}`;
+        } catch (err) {}
+
+        const startY = applyStandardHeader(
+            doc,
+            `RICHIESTA DI QUOTAZIONE (RFQ)`,
+            client.name,
+            reportId,
+            adminProfile,
+            'Generato per rinegoziazione accordo fornitura'
+        );
+
+        let currentY = startY + 10;
+        
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Dettagli Richiesta", margin, currentY);
+        currentY += 10;
+
+        doc.setFontSize(10);
+        doc.setTextColor(40, 40, 40);
+        
+        const details = [
+            `Oggetto: Rinegoziazione prezzo di fornitura`,
+            `Fornitore Corrente: ${action.supplierId || 'Non specificato'}`,
+            `Data Generazione: ${new Date().toLocaleDateString('it-IT')}`,
+            ``,
+            `Con la presente si richiede una revisione delle condizioni economiche per il seguente articolo:`
+        ];
+
+        details.forEach(line => {
+            doc.text(line, margin, currentY);
+            currentY += 6;
+        });
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Articolo (SKU)', 'Descrizione Categoria', 'Q.tà Annua Stimata', 'Target Prezzo (€)']],
+            body: [
+                [action.itemSku, action.categoryName, action.annualQty?.toLocaleString() || '-', `€ ${action.targetPrice.toLocaleString()}`]
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: primaryColor as [number, number, number] },
+            margin: { left: margin, right: margin }
+        });
+
+        const tableFinalY = (doc as any).lastAutoTable.finalY + 20;
+        
+        doc.text(`Rimango a disposizione per discutere le specifiche e i volumi della fornitura.`, margin, tableFinalY);
+        
+        applyStandardSignature(doc, tableFinalY + 15, adminProfile, "Buyer / Procurement Manager");
+        applyPageFooter(doc, reportId, client.name);
+
+        doc.save(`${reportId}_${action.itemSku}_RFQ.pdf`);
+        setSuccess(`RFQ PDF generato con successo!`);
+        setTimeout(() => setSuccess(null), 3000);
+    } catch (e) {
+        console.error("Errore generazione RFQ", e);
+    }
+  };
+
   const handleGenerateReport = async (format: 'PDF' | 'EXCEL') => {
     setGenerating(true);
     try {
@@ -315,6 +412,16 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
             ['Avanzamento (SAL)', 'Stato Avanzamento Lavori, indica la percentuale di completamento di un progetto.'],
             ['Tasso Rilavorazione', 'Percentuale di lavori che abbiamo dovuto rifare a causa di errori.'],
             ['Indice SAL Temporale', 'Andamento del completamento dei lavori nel corso del tempo.']
+          ];
+          case 'BUDGET': return [
+            ['Assegnato', 'Il budget totale allocato in base a contratti od ordini.'],
+            ['Speso', 'La parte del budget che è già stata utilizzata.'],
+            ['Residuo', 'Budget ancora disponibile al netto del consumato.'],
+            ['Modalità Assegnazione', 'Regola con cui il sistema attribuisce i parametri temporali o fisici al budget.']
+          ];
+          case 'SAVINGS_TRACKER': return [
+            ['CERTIFIED', 'Il risparmio è stato certificato ed applicato.'],
+            ['IN_PROGRESS', 'Risparmio in fase di negoziazione o applicazione.']
           ];
           default: return [];
         }
@@ -369,6 +476,23 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
             ['Avanzamento (SAL)', trendData.length > 0 ? '88.0%' : '0%'],
             ['Tasso Rilavorazione', trendData.length > 0 ? '1.8%' : '0%'],
           ];
+        } else if (reportType === 'BUDGET') {
+          headData = [['Metric', 'Valore']];
+          bodyData = [
+            ['Totale Assegnato', '€ ' + budgetAnalyticsData.assigned.toLocaleString()],
+            ['Totale Speso', '€ ' + budgetAnalyticsData.spent.toLocaleString()],
+            ['Residuo', '€ ' + (budgetAnalyticsData.assigned - budgetAnalyticsData.spent).toLocaleString()],
+          ];
+        } else if (reportType === 'SAVINGS_TRACKER') {
+          headData = [['Data', 'Categoria', 'Articolo', 'Tipo Azione', 'Stato', 'Saving Calcolato']];
+          bodyData = savingsActions.map(a => [
+            new Date(a.createdAt).toLocaleDateString('it-IT'),
+            a.categoryName,
+            a.itemSku,
+            a.type,
+            a.status,
+            '€ ' + a.savingAmount.toLocaleString()
+          ]);
         }
 
         let chartImage: string | null = null;
@@ -461,6 +585,10 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
           wsData = [['Mese', 'Volume', 'Growth (%)', 'CAGR (%)'], ...trendData.map(t => [t.name, t.value, t.growth, t.cagr])];
         } else if (reportType === 'GOVERNANCE') {
           wsData = [['KPI', 'Valore'], ['Margine Contribuzione', trendData.length > 0 ? '32.4%' : '0%'], ['Scostamento Ore', trendData.length > 0 ? '-4.2%' : '0%'], ['Avanzamento (SAL)', trendData.length > 0 ? '88.0%' : '0%'], ['Tasso Rilavorazione', trendData.length > 0 ? '1.8%' : '0%']];
+        } else if (reportType === 'BUDGET') {
+          wsData = [['Metric', 'Valore'], ['Totale Assegnato', budgetAnalyticsData.assigned], ['Totale Speso', budgetAnalyticsData.spent], ['Residuo', budgetAnalyticsData.assigned - budgetAnalyticsData.spent]];
+        } else if (reportType === 'SAVINGS_TRACKER') {
+          wsData = [['Data Creazione', 'Categoria', 'Articolo', 'Tipo Azione', 'Stato', 'Saving Calcolato'], ...savingsActions.map(a => [new Date(a.createdAt).toLocaleDateString('it-IT'), a.categoryName, a.itemSku, a.type, a.status, a.savingAmount])];
         }
 
         const wb = XLSX.utils.book_new();
@@ -559,7 +687,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
 
       {/* Tabs */}
       <div className="flex flex-wrap justify-center gap-4">
-          {(['PERFORMANCE', 'QUALITY', 'COMMERCIAL', 'FEE_REVENUE', 'TREND', 'GOVERNANCE'] as const).map((tab) => {
+          {(['PERFORMANCE', 'QUALITY', 'COMMERCIAL', 'FEE_REVENUE', 'TREND', 'GOVERNANCE', 'BUDGET', 'SAVINGS_TRACKER'] as const).map((tab) => {
              let title = '';
              let description = '';
              let usage = '';
@@ -587,6 +715,14 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
                  title = "Governance & Controllo";
                  description = "Controlla se stiamo rispettando i tempi e se stiamo guadagnando il giusto.";
                  usage = "Clicca per vedere i controlli.";
+             } else if (tab === 'BUDGET') {
+                 title = "Analisi Budget";
+                 description = "Statistiche e KPI relativi ai budget assegnati ed al loro utilizzo.";
+                 usage = "Clicca per visualizzare le metriche dei budget.";
+             } else if (tab === 'SAVINGS_TRACKER') {
+                 title = "Savings Tracker";
+                 description = "Tracciamento delle azioni di saving (switch fornitore, rinegoziazione) e certificazione dei risparmi.";
+                 usage = "Clicca per visualizzare le azioni di saving attive.";
              }
 
              return (
@@ -601,6 +737,8 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
                   {tab === 'FEE_REVENUE' && 'Fatturato Fee'}
                   {tab === 'TREND' && 'Trend Intermediato'}
                   {tab === 'GOVERNANCE' && 'Governance & Controllo'}
+                  {tab === 'BUDGET' && 'Budget'}
+                  {tab === 'SAVINGS_TRACKER' && 'Savings Action Tracker'}
                </button>
              </Tooltip>
              );
@@ -1038,6 +1176,79 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
           </div>
       )}
 
+      {/* BUDGET VIEW */}
+      {reportType === 'BUDGET' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+              <div className="neu-flat p-8">
+                  <Tooltip position="top" content={{ title: "Distribuzione Assegnazione Budget", description: "Vedi in base a quale modalità il budget è stato assegnato ai clienti.", usage: "Un grafico a torta che divide le modalità." }}>
+                      <h3 className="text-lg font-bold text-slate-700 mb-6 inline-block">Assegnazioni per Modalità</h3>
+                  </Tooltip>
+                  <div className="h-80 w-full min-h-[320px] min-w-0 relative">
+                      {(!budgetAnalyticsData.modes || budgetAnalyticsData.modes.length === 0) && <EmptyStateOverlay />}
+                      <ResponsiveContainer width="100%" height={320} minWidth={0} minHeight={0} debounce={50}>
+                        <PieChart>
+                          <Pie
+                            data={budgetAnalyticsData.modes}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={110}
+                            paddingAngle={5}
+                            dataKey="value"
+                            nameKey="name"
+                          >
+                            {budgetAnalyticsData.modes.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip contentStyle={{background: '#EEF2F6', border: 'none', borderRadius: '12px'}} formatter={(value: number) => `${value} Budget`} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                  </div>
+              </div>
+
+              <div className="space-y-8">
+                 <div className="neu-flat p-8 relative overflow-hidden group">
+                    <Tooltip position="top" content={{ title: "Andamento di Spesa", description: "Mostra lo stato di consumo del budget complessivo per il cliente.", usage: "Più ci avviciniamo al totale, più il residuo è basso." }}>
+                      <h4 className="text-blue-600 text-xs font-black uppercase tracking-widest mb-2 inline-block">Stato Consumo Budget</h4>
+                    </Tooltip>
+                    <div className="flex justify-between items-end mb-2">
+                        <p className="text-4xl font-black text-slate-700">€ {budgetAnalyticsData.spent.toLocaleString('it-IT')}</p>
+                        <p className="text-sm font-bold text-slate-500 mb-1">/ € {budgetAnalyticsData.assigned.toLocaleString('it-IT')}</p>
+                    </div>
+                    <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mt-4">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${budgetAnalyticsData.assigned > 0 && (budgetAnalyticsData.spent / budgetAnalyticsData.assigned) > 0.9 ? 'bg-red-500' : 'bg-blue-500'}`} 
+                          style={{ width: `${budgetAnalyticsData.assigned > 0 ? (budgetAnalyticsData.spent / budgetAnalyticsData.assigned) * 100 : 0}%` }}
+                        ></div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 mt-3 text-right">
+                       Residuo: € {(budgetAnalyticsData.assigned - budgetAnalyticsData.spent).toLocaleString('it-IT')}
+                    </p>
+                 </div>
+
+                 <div className="neu-flat p-8">
+                     <h3 className="text-sm font-bold text-slate-700 mb-4 inline-block">Stato Budget</h3>
+                     <div className="space-y-3">
+                         {budgetAnalyticsData.status.map((item: any, idx: number) => (
+                             <div key={idx} className="flex justify-between items-center text-sm">
+                                 <div className="flex items-center gap-2">
+                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                     <span className="font-bold text-slate-600">{item.name}</span>
+                                 </div>
+                                 <span className="font-bold text-slate-800">{item.value}</span>
+                             </div>
+                         ))}
+                         {budgetAnalyticsData.status.length === 0 && (
+                             <p className="text-xs text-slate-400">Nessun dato disponibile.</p>
+                         )}
+                     </div>
+                 </div>
+              </div>
+          </div>
+      )}
+
       {/* TREND & CAGR VIEW */}
       {reportType === 'TREND' && (
           <div className="grid grid-cols-1 gap-8 animate-fade-in">
@@ -1145,6 +1356,83 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
                   </div>
               </div>
           </div>
+      )}
+
+      {/* SAVINGS TRACKER VIEW */}
+      {reportType === 'SAVINGS_TRACKER' && (
+          <div className="grid grid-cols-1 gap-8 animate-fade-in">
+              <div className="neu-flat p-8">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-lg font-bold text-slate-700">Pipeline Azioni di Saving</h3>
+                      <div className="px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm border border-emerald-200">
+                          {savingsActions.filter(a => a.status === 'CERTIFIED').length} Azioni Certificate
+                      </div>
+                  </div>
+                  
+                  <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr>
+                                  <th className="p-3 text-slate-500 font-bold">Data Creazione</th>
+                                  <th className="p-3 text-slate-500 font-bold">Categoria</th>
+                                  <th className="p-3 text-slate-500 font-bold">Articolo</th>
+                                  <th className="p-3 text-slate-500 font-bold">Tipo Azione</th>
+                                  <th className="p-3 text-slate-500 font-bold text-center">Stato</th>
+                                  <th className="p-3 text-slate-500 font-bold text-right">Saving Calcolato</th>
+                                  <th className="p-3 text-slate-500 font-bold text-center w-32">Azioni</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {savingsActions.length === 0 ? (
+                                  <tr><td colSpan={7} className="p-8 text-center text-slate-500 italic">Nessuna azione di saving registrata. <button onClick={() => setSavingsWizardOpen(true)} className="text-emerald-600 hover:text-emerald-700 font-medium underline">Usa il Savings Target Wizard per inizializzare il tracking.</button></td></tr>
+                              ) : savingsActions.map(action => (
+                                  <tr key={action.id} className="hover:bg-slate-50">
+                                      <td className="p-3 text-slate-600 tabular-nums">{new Date(action.createdAt).toLocaleDateString('it-IT')}</td>
+                                      <td className="p-3 font-bold text-slate-700">{action.categoryName}</td>
+                                      <td className="p-3">
+                                        <div className="font-bold text-slate-700">{action.itemSku}</div>
+                                        <div className="text-xs text-slate-400 truncate max-w-[200px]">{action.itemName}</div>
+                                      </td>
+                                      <td className="p-3">
+                                          <span className="px-2 py-1 rounded-md text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200">
+                                              {action.type}
+                                          </span>
+                                      </td>
+                                      <td className="p-3 text-center">
+                                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                                              action.status === 'CERTIFIED' ? 'bg-emerald-100 text-emerald-700' : 
+                                              action.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
+                                          }`}>
+                                              {action.status}
+                                          </span>
+                                      </td>
+                                      <td className="p-3 text-right font-bold text-emerald-600 bg-emerald-50/20">
+                                          € {action.savingAmount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="p-3 text-center w-32">
+                                          {action.type === 'RENEGOTIATION' && action.status === 'IN_PROGRESS' && (
+                                              <button 
+                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm transition-colors"
+                                                onClick={() => handleGenerateRFQ(action)}
+                                              >
+                                                Genera RFQ
+                                              </button>
+                                          )}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {isSavingsWizardOpen && (
+        <SavingsTargetWizard 
+          client={client}
+          onClose={() => setSavingsWizardOpen(false)}
+        />
       )}
 
     </div>

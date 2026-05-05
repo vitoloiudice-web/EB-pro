@@ -83,6 +83,21 @@ class DataService {
     if (USE_FIRESTORE) return firestoreService.deleteCustomer(customerId);
   }
 
+  public async getBudgets(client: Client, page: number = 1, pageSize: number = 20, search: string = '', filters: any = {}) {
+    if (!client) return { data: [], total: 0 };
+    if (USE_FIRESTORE) return firestoreService.getBudgets(client, page, pageSize, search, filters);
+    return { data: [], total: 0 };
+  }
+
+  public async saveBudget(client: Client, budget: any, isNew: boolean) {
+    if (!client) throw new Error("Client is required");
+    if (USE_FIRESTORE) return firestoreService.saveBudget(client, budget, isNew);
+  }
+
+  public async deleteBudget(budgetId: string) {
+    if (USE_FIRESTORE) return firestoreService.deleteBudget(budgetId);
+  }
+
   public async getAdminProfile(client: Client) {
     if (!client) return null;
     if (USE_FIRESTORE) return firestoreService.getAdminProfile(client);
@@ -120,8 +135,19 @@ class DataService {
     if (USE_FIRESTORE) return firestoreService.saveOrder(client, order, isNew);
   }
 
-  public async deleteOrder(orderId: string) {
-    if (USE_FIRESTORE) return firestoreService.deleteOrder(orderId);
+  public async deleteOrder(client: Client, orderId: string) {
+    if (USE_FIRESTORE) return firestoreService.deleteOrder(client, orderId);
+  }
+
+  public async saveSavingAction(client: Client, action: any) {
+    if (!client) throw new Error("Client is required");
+    if (USE_FIRESTORE) return firestoreService.saveSavingAction(client, action);
+  }
+
+  public async getSavingActions(client: Client) {
+    if (!client) return [];
+    if (USE_FIRESTORE) return firestoreService.getSavingActions(client);
+    return [];
   }
 
   public async getLogisticsEvents(client: Client, page: number, pageSize: number, search: string) {

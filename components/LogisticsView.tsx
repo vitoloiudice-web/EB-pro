@@ -68,7 +68,7 @@ const LogisticsView: React.FC<LogisticsViewProps> = ({ client, initialFilter }) 
 
   const handleDeleteOrder = async (id: string) => {
     try {
-      await dataService.deleteOrder(id);
+      await dataService.deleteOrder(client, id);
       setIsOrderModalOpen(false);
       setSuccess("Ordine eliminato con successo!");
       setTimeout(() => setSuccess(null), 3000);

@@ -9,6 +9,7 @@ export enum ViewState {
   MRP = 'MRP',
   LOGISTICS = 'LOGISTICS',
   MASTER_DATA = 'MASTER_DATA',
+  BUDGET = 'BUDGET', // Gestione Budget Clienti
   BI = 'BI', // Business Intelligence
   SUPPLIER_QUALIFICATION = 'SUPPLIER_QUALIFICATION',
   SUPPLIER_SCOUTING = 'SUPPLIER_SCOUTING', // Nuova vista
@@ -316,4 +317,72 @@ export interface GeneratedDocument {
   pdf_backup_url?: string;
   created_by?: string;
   created_at?: string;
+}
+
+// --- BUDGET MANAGEMENT SYSTEM ---
+
+export interface SavingsTarget {
+  id?: string;
+  clientId: string;
+  categoryName: string;
+  targetPercent: number;        // es. 5
+  targetAbsolute: number;       // es. 14000
+  baselineBudget: number;       // budget di partenza
+  savingRealized: number;       // Σ saving certificati
+  savingPipeline: number;       // Σ saving in trattativa
+  status: 'ON_TRACK' | 'AT_RISK' | 'ACHIEVED';
+  createdAt: string;
+}
+
+export interface SavingAction {
+  id: string;
+  clientId: string;
+  itemSku: string;
+  itemName: string;
+  categoryName: string;
+  type: 'SUPPLIER_SWITCH' | 'RENEGOTIATION' | 'LOT_CONSOLIDATION';
+  status: 'PENDING' | 'IN_PROGRESS' | 'CERTIFIED';
+  baselinePrice: number;
+  targetPrice: number;
+  annualQty: number;
+  savingAmount: number;         // (baseline - target) × annualQty
+  supplierId?: string;
+  notes?: string;
+  certifiedAt?: string;
+  createdAt: string;
+}
+
+export type BudgetAssignmentMode = 'SVINCOLATO' | 'VINCOLO_ITEM' | 'VINCOLO_ITEM_TEMPO';
+
+export type BudgetTimePeriod = 'A_CONTRATTO' | 'ANNUALE' | 'SEMESTRALE' | 'TRIMESTRALE' | 'MENSILE';
+
+export interface Budget {
+  id: string;
+  customerId: string; // Cliente che ha assegnato il budget
+  customerName: string; // Denormalizzazione per performance
+  assignmentMode: BudgetAssignmentMode;
+  period: BudgetTimePeriod;
+  
+  // Riferimenti temporali precisi
+  year?: number; // Es. 2024
+  periodValue?: number; // Es. 1 per primo semestre, 3 per terzo trimestre, 5 per Maggio
+  startDate?: string;
+  endDate?: string;
+
+  // Vincoli di categoria/articolo (se applicabili)
+  category?: string;
+  skuPrefix?: string;
+  group?: string;
+  macroFamily?: string;
+  family?: string;
+
+  // Valori economici
+  amountAssigned: number; // Budget iniziale (Assegnato)
+  amountSpent: number; // Calcolato in base ai PO chiusi o ricevuti
+  amountCommitted?: number; // Ordini in corso/aperti
+  currency: string;
+  
+  status: 'ACTIVE' | 'EXHAUSTED' | 'EXPIRED' | 'DRAFT';
+  notes?: string;
+  updatedAt: string;
 }

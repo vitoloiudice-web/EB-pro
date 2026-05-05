@@ -289,6 +289,76 @@ class FirestoreService {
     }
   }
 
+  // --- BUDGETS ---
+  public async getBudgets(client: Client, page: number = 1, pageSize: number = 20, search: string = '', filters: any = {}): Promise<PaginatedResponse<any>> {
+    if (!client) return { data: [], total: 0 };
+    const path = 'budgets';
+    try {
+      let qConstraints: QueryConstraint[] = [
+        where('client_id', '==', client.id),
+        limit(1000)
+      ];
+
+      const q = query(collection(db, path), ...qConstraints);
+      const snapshot = await getDocs(q);
+      
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+      if (search) {
+        const s = search.toLowerCase();
+        data = data.filter(b => b.customerName?.toLowerCase().includes(s) || b.notes?.toLowerCase().includes(s));
+      }
+
+      if (filters && filters.filterMode && filters.filterMode !== 'ALL') {
+        data = data.filter(b => b.assignmentMode === filters.filterMode);
+      }
+
+      const total = data.length;
+      const startIndex = (page - 1) * pageSize;
+      data = data.slice(startIndex, startIndex + pageSize);
+
+      return { data, total };
+    } catch (error: any) {
+      if (error.message && error.message.includes('client is offline')) {
+        return { data: [], total: 0 };
+      }
+      handleFirestoreError(error, OperationType.LIST, path);
+      return { data: [], total: 0 };
+    }
+  }
+
+  public async saveBudget(client: Client, budget: any, isNew: boolean) {
+    if (!client) throw new Error("Client is required to save budget");
+    const path = 'budgets';
+    try {
+      const data = { ...budget, client_id: client.id, updatedAt: new Date().toISOString() };
+      
+      // If we are creating, set initial amounts
+      if (isNew) {
+         data.amountSpent = 0;
+         data.amountCommitted = 0;
+      }
+
+      if (isNew) {
+        await addDoc(collection(db, path), data);
+      } else {
+        const { id, ...updateData } = data;
+        await updateDoc(doc(db, path, budget.id), updateData);
+      }
+    } catch (error) {
+      handleFirestoreError(error, isNew ? OperationType.CREATE : OperationType.UPDATE, path);
+    }
+  }
+
+  public async deleteBudget(budgetId: string) {
+    const path = 'budgets';
+    try {
+      await deleteDoc(doc(db, path, budgetId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  }
+
   // --- ADMIN PROFILE ---
   public async getAdminProfile(client: Client) {
     if (!client) return null;
@@ -495,6 +565,53 @@ class FirestoreService {
     }
   }
 
+  public async recalculateClientBudgets(client: Client) {
+    if (!client) return;
+    try {
+      const path = 'budgets';
+      const qBudgets = query(collection(db, path), where('client_id', '==', client.id));
+      const snapBudgets = await getDocs(qBudgets);
+      if (snapBudgets.empty) return;
+      
+      const budgets = snapBudgets.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+      const qOrders = query(collection(db, 'purchase_orders'), where('client_id', '==', client.id));
+      const snapOrders = await getDocs(qOrders);
+      const orders = snapOrders.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+      for (const b of budgets) {
+         let spent = 0;
+         let committed = 0;
+         
+         const validOrders = orders.filter(o => {
+            // Se c'è un vincolo item/categoria (per semplicità qui associamo il total)
+            // In un sistema reale, si filtrerebbero gli items dell'ordine in base ai constraintCategory
+            // e checking whether the order date falls within the budget period.
+            if (b.periodStart && new Date(o.date) < new Date(b.periodStart)) return false;
+            if (b.periodEnd && new Date(o.date) > new Date(b.periodEnd)) return false;
+            return true;
+         });
+
+         validOrders.forEach(o => {
+            const tot = o.totalAmount || 0;
+            if (o.status === 'CONFIRMED' || o.status === 'SHIPPED' || o.status === 'RECEIVED' || o.status === 'DELIVERED') {
+               spent += tot;
+            } else if (o.status === 'DRAFT' || o.status === 'SENT') {
+               committed += tot;
+            }
+         });
+
+         await updateDoc(doc(db, path, b.id), {
+            amountSpent: spent,
+            amountCommitted: committed,
+            updatedAt: new Date().toISOString()
+         });
+      }
+    } catch (error) {
+       console.error("Error recalculating budgets:", error);
+    }
+  }
+
   public async saveOrder(client: Client, order: any, isNew: boolean) {
     if (!client) throw new Error("Client is required to save order");
     const path = 'purchase_orders';
@@ -506,17 +623,54 @@ class FirestoreService {
         const orderRef = doc(db, path, order.id);
         await setDoc(orderRef, data, { merge: true });
       }
+      // Re-compute budget consumption dynamically (Punto 7)
+      await this.recalculateClientBudgets(client);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   }
 
-  public async deleteOrder(orderId: string) {
+  public async deleteOrder(client: Client, orderId: string) {
+    if (!client) throw new Error("Client is required to delete order");
     const path = 'purchase_orders';
     try {
       await deleteDoc(doc(db, path, orderId));
+      await this.recalculateClientBudgets(client);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  }
+
+  public async saveSavingAction(client: Client, action: any) {
+    if (!client) throw new Error("Client is required");
+    const path = `saving_actions`;
+    try {
+      const data = {
+        ...action,
+        clientId: client.id,
+        createdAt: action.createdAt || new Date().toISOString()
+      };
+      
+      if (!action.id) {
+        await addDoc(collection(db, path), data);
+      } else {
+        const docRef = doc(db, path, action.id);
+        await setDoc(docRef, data, { merge: true });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  }
+
+  public async getSavingActions(client: Client) {
+    if (!client) return [];
+    try {
+      const q = query(collection(db, 'saving_actions'), where('clientId', '==', client.id));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, 'saving_actions');
+      return [];
     }
   }
 
@@ -555,18 +709,20 @@ class FirestoreService {
   public async getBIData(client: Client) {
     if (!client) return null;
     try {
-      const [suppliersRes, itemsRes, ordersRes, customersRes] = await Promise.all([
+      const [suppliersRes, itemsRes, ordersRes, customersRes, budgetsRes] = await Promise.all([
         this.getSuppliers(client, 1, 1000),
         this.getItems(client, 1, 1000),
         this.getOrders(client, 1, 1000),
-        this.getCustomers(client, 1, 1000)
+        this.getCustomers(client, 1, 1000),
+        this.getBudgets(client, 1, 1000)
       ]);
 
       return {
         suppliers: suppliersRes.data,
         items: itemsRes.data,
         orders: ordersRes.data,
-        customers: customersRes.data
+        customers: customersRes.data,
+        budgets: budgetsRes.data
       };
     } catch (error) {
       console.error("Error fetching BI data:", error);

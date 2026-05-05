@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import GeminiActionModal from './GeminiActionModal';
 import BudgetManagerModal from './BudgetManagerModal';
 import PurchaseOrderModal from './PurchaseOrderModal';
+import SavingsTargetWizard from './SavingsTargetWizard';
 import Tooltip from './common/Tooltip';
 
 interface DashboardProps {
@@ -27,6 +28,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onNavigate }) => {
   const [isGeminiModalOpen, setGeminiModalOpen] = useState(false);
   const [isBudgetModalOpen, setBudgetModalOpen] = useState(false);
   const [isOrderModalOpen, setOrderModalOpen] = useState(false);
+  const [isSavingsModalOpen, setSavingsModalOpen] = useState(false);
   
   // Filter State for Trend Chart
   const [trendTimeRange, setTrendTimeRange] = useState<'1M' | '3M' | '6M' | 'YTD'>('6M');
@@ -242,9 +244,24 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onNavigate }) => {
         onSave={handleSaveOrder}
         client={clients[0]}
       />
+      {isSavingsModalOpen && (
+        <SavingsTargetWizard 
+          client={clients[0]}
+          onClose={() => setSavingsModalOpen(false)}
+        />
+      )}
 
       {/* Top Actions */}
       <div className="flex flex-wrap justify-end gap-4">
+          <Tooltip position="bottom" className="w-full sm:w-auto" content={{ title: "Savings Target Wizard", description: "Configura gli obiettivi di risparmio e identifica i price gap.", usage: "Clicca per avviare l'analisi." }}>
+            <button 
+              onClick={() => setSavingsModalOpen(true)}
+              className="neu-btn px-5 py-2.5 text-sm text-emerald-600 font-bold w-full sm:w-auto flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              Savings Target Wizard
+            </button>
+          </Tooltip>
           <Tooltip position="bottom" className="w-full sm:w-auto" content={{ title: "Esportazione Report", description: "Genera un documento PDF/Excel con i dati consolidati della dashboard.", usage: "Clicca per scaricare il report corrente." }}>
             <button className="neu-btn px-5 py-2.5 text-sm w-full">
               <svg className="w-4 h-4 mr-2 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
