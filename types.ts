@@ -254,6 +254,22 @@ export interface Customer {
   monthlyFee?: number;
   contractStartDate?: string;
   contractEndDate?: string;
+  
+  // Enterprise Service Contract Ext.
+  standardMonthlyFee?: number; // Fee di default configurata in anagrafica
+  standardGeneralTerms?: string[]; // Termini standard configurati in anagrafica
+  customContractNotes?: string; // Note/Termini specifici aggiunti via modale
+  legalRepresentative?: string;
+  taxId?: string;
+  expenseBudget?: number;
+  expenseFrequency?: string;
+  expensePreventivo?: boolean;
+  expensePreventivoText?: string;
+  expenseConsuntivo?: boolean;
+  expenseConsuntivoText?: string;
+  savingTarget?: number;
+  penaltyReduction?: number;
+  contractNumber?: string;
 }
 
 export interface PurchaseOrderItem {
@@ -334,7 +350,7 @@ export interface ImportFieldMapping {
   fileColumn: string; // The header in the CSV/Excel
 }
 
-export type DocumentType = 'RICHIESTA_BUDGET' | 'ORDINE_ACQUISTO' | 'QUALIFICA_FORNITORE' | 'REPORT_ANALYTICS';
+export type DocumentType = 'RICHIESTA_BUDGET' | 'ORDINE_ACQUISTO' | 'QUALIFICA_FORNITORE' | 'REPORT_ANALYTICS' | 'CONTRATTO' | 'RFQ';
 
 export interface GeneratedDocument {
   id?: string;

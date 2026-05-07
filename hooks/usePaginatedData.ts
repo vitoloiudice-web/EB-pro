@@ -30,7 +30,7 @@ export function usePaginatedData<T>({ fetchMethod, pageSize = 20, initialSearch 
   }, [fetchMethod]);
 
   // Track last fetched parameters to avoid infinite loops
-  const lastFetchedRef = useRef({ page: -1, search: '___', filtersStr: '' });
+  const lastFetchedRef = useRef({ page: -1, search: '___', filtersStr: '', method: null as any });
 
   const fetchData = useCallback(async (currentPage: number, currentSearch: string, currentFilters: any, force = false) => {
     const filtersStr = JSON.stringify(currentFilters);

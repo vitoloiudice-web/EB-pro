@@ -365,7 +365,7 @@ const BusinessIntelligenceView: React.FC<BIProps> = ({ client }) => {
         doc.text(`Rimango a disposizione per discutere le specifiche e i volumi della fornitura.`, margin, tableFinalY);
         
         applyStandardSignature(doc, tableFinalY + 15, adminProfile, "Buyer / Procurement Manager");
-        applyPageFooter(doc, reportId, client.name);
+        applyPageFooter(doc, reportId, adminProfile);
 
         doc.save(`${reportId}_${action.itemSku}_RFQ.pdf`);
         setSuccess(`RFQ PDF generato con successo!`);

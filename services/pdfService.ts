@@ -13,8 +13,128 @@ export const PDF_CONFIG = {
 };
 
 /**
- * Standard Header for all application PDFs
- * Logo (Top Left), Spacing, Title (Top Right, Underlined), Info Block (Right underneath)
+ * Basic Header: Logo, Company Details, Separation Line
+ * Repeats on every page.
+ */
+export const applyMinimalHeader = (
+  doc: jsPDF,
+  adminProfile: AdminProfile | null
+) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { margin, secondaryColor } = PDF_CONFIG;
+
+  // 1. Logo Area (Top Left)
+  const logoY = 15;
+  const logoMaxWidth = 42;
+  const logoMaxHeight = 20;
+  let finalLogoHeight = logoMaxHeight;
+
+  if (adminProfile?.logoUrl) {
+    try {
+      const imgProps = (doc as any).getImageProperties(adminProfile.logoUrl);
+      const ratio = imgProps.width / imgProps.height;
+      
+      let finalWidth = logoMaxWidth;
+      let finalHeight = logoMaxWidth / ratio;
+      
+      if (finalHeight > logoMaxHeight) {
+        finalHeight = logoMaxHeight;
+        finalWidth = logoMaxHeight * ratio;
+      }
+      
+      finalLogoHeight = finalHeight;
+      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, finalWidth, finalHeight);
+    } catch (e) {
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(adminProfile?.companyName || "EB-PRO", margin, logoY + 5);
+      finalLogoHeight = 5;
+    }
+  } else {
+    doc.setFontSize(10);
+    doc.setTextColor(200);
+    doc.text("EB-PRO", margin, logoY + 10);
+    finalLogoHeight = 10;
+  }
+
+  // 1b. Company Details (Right aligned)
+  doc.setFontSize(7.5);
+  doc.setTextColor(secondaryColor[0]);
+  doc.setFont(doc.getFont().fontName, 'normal');
+  
+  const textOptions = { align: 'right' as const };
+  const detailsX = pageWidth - margin;
+  
+  doc.text([
+      "EasyBuy",
+      `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
+      `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
+      `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`
+  ], detailsX, logoY + 3, textOptions);
+
+  // 1c. Separation Line under Logo/Details
+  doc.setDrawColor(220, 220, 220); // Light gray
+  doc.setLineWidth(0.1);
+  const lineY = logoY + 22;
+  doc.line(margin, lineY, pageWidth - margin, lineY);
+
+  return lineY;
+};
+
+/**
+ * Applies Document Metadata: Title, Underline, and Info Block (Doc Num, Date, Client)
+ * Usually only on the first page.
+ */
+export const applyDocumentMetadata = (
+  doc: jsPDF,
+  title: string,
+  recipientName: string,
+  docNumber: string,
+  startY: number,
+  docDate?: string
+) => {
+  const dateFormatted = docDate || new Date().toLocaleDateString('it-IT');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const { margin, primaryColor, secondaryColor } = PDF_CONFIG;
+
+  // 2. Title - Centered
+  const gap = 8;
+  const titleY = startY + gap; 
+  doc.setFont(doc.getFont().fontName, 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Pantone 648 C
+  const titleText = title.toUpperCase();
+  const titleWidth = doc.getTextWidth(titleText);
+  const titleX = (pageWidth - titleWidth) / 2;
+  doc.text(titleText, titleX, titleY);
+
+  // 3. Underline - Blue line
+  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setLineWidth(0.3);
+  doc.line(titleX, titleY + 1.5, titleX + titleWidth, titleY + 1.5);
+
+  // 4. Info Block - Right Aligned
+  const infoY = titleY + 12; // Spacing after title
+  doc.setFont(doc.getFont().fontName, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(secondaryColor[0]);
+  
+  const docNumText = `Documento N.: ${docNumber}`;
+  const dateText = `Data: ${dateFormatted}`;
+  const recipientText = `Cliente: ${recipientName}`;
+
+  doc.text(docNumText, pageWidth - margin - doc.getTextWidth(docNumText), infoY);
+  doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), infoY + 5);
+  doc.text(recipientText, pageWidth - margin - doc.getTextWidth(recipientText), infoY + 10);
+
+  // Reset colors
+  doc.setTextColor(50, 50, 50);
+  
+  return infoY + 12; 
+};
+
+/**
+ * Standard Header (Minimal + Metadata)
  */
 export const applyStandardHeader = (
   doc: jsPDF,
@@ -24,96 +144,8 @@ export const applyStandardHeader = (
   adminProfile: AdminProfile | null,
   docDate?: string
 ) => {
-  const dateFormatted = docDate || new Date().toLocaleDateString('it-IT');
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const { margin, primaryColor, secondaryColor } = PDF_CONFIG;
-
-  // 1. Logo Area (Top Left)
-  const logoY = 15;
-  const logoMaxWidth = 42;
-  const logoMaxHeight = 20;
-  let finalLogoHeight = logoMaxHeight;
-  let finalLogoWidth = logoMaxWidth;
-
-  if (adminProfile?.logoUrl) {
-    try {
-      const imgProps = (doc as any).getImageProperties(adminProfile.logoUrl);
-      const ratio = imgProps.width / imgProps.height;
-      
-      finalLogoWidth = logoMaxWidth;
-      let finalHeight = logoMaxWidth / ratio;
-      
-      if (finalHeight > logoMaxHeight) {
-        finalHeight = logoMaxHeight;
-        finalLogoWidth = logoMaxHeight * ratio;
-      }
-      
-      finalLogoHeight = finalHeight;
-      doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, finalLogoWidth, finalHeight);
-    } catch (e) {
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text(adminProfile?.companyName || "EB-PRO", margin, logoY + 5);
-      finalLogoHeight = 5;
-      finalLogoWidth = 15;
-    }
-  } else {
-    doc.setFontSize(10);
-    doc.setTextColor(200);
-    doc.text("EB-PRO", margin, logoY + 10);
-    finalLogoHeight = 10;
-    finalLogoWidth = 15;
-  }
-
-  // 1b. Company Details (Next to Logo)
-  doc.setFontSize(7.5);
-  doc.setTextColor(secondaryColor[0]);
-  doc.setFont(doc.getFont().fontName, 'normal');
-  const detailsX = margin + finalLogoWidth + 5;
-  doc.text([
-      adminProfile?.companyName || "EB-Pro Centrale Acquisti",
-      `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
-      `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
-      `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
-      `Regime Fiscale: Ordinario / Split Payment`
-  ], detailsX, logoY + 3);
-
-  // 2. Title - Right Aligned (Positioned BELOW logo with spacing)
-  // Gap between bottom of logo and title increased by 3% (from 12 to 12.36)
-  const gap = 12.36;
-  const titleY = logoY + finalLogoHeight + gap; 
-  doc.setFont(doc.getFont().fontName, 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Pantone 648 C
-  const titleText = title.toUpperCase();
-  const titleWidth = doc.getTextWidth(titleText);
-  const titleX = pageWidth - margin - titleWidth;
-  doc.text(titleText, titleX, titleY);
-
-  // 3. Underline - Thin line below title (0.1 mm as requested)
-  // Use Blue for the underline too to match title
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setLineWidth(0.1);
-  doc.line(titleX, titleY + 2, pageWidth - margin, titleY + 2);
-
-  // 4. Info Block (Data + Document Number + Recipient) - Right Aligned
-  const infoY = titleY + 15; // Spacing after title
-  doc.setFont(doc.getFont().fontName, 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(secondaryColor[0]);
-  
-  const docNumText = `Documento N.: ${docNumber}`;
-  const dateText = `Data: ${dateFormatted}`;
-  const recipientText = `Destinatario: ${recipientName}`;
-
-  doc.text(docNumText, pageWidth - margin - doc.getTextWidth(docNumText), infoY);
-  doc.text(dateText, pageWidth - margin - doc.getTextWidth(dateText), infoY + 6);
-  doc.text(recipientText, pageWidth - margin - doc.getTextWidth(recipientText), infoY + 12);
-
-  // Reset colors
-  doc.setTextColor(50, 50, 50);
-  
-  return infoY + 30; // Suggested Y position for content (Body starts here)
+  const lineY = applyMinimalHeader(doc, adminProfile);
+  return applyDocumentMetadata(doc, title, recipientName, docNumber, lineY, docDate);
 };
 
 /**
@@ -174,20 +206,26 @@ export const applyPageFooter = (
     // 1. Separation Line (0.05 mm) - RED Pantone 2035 C
     doc.setDrawColor(accentColorRed[0], accentColorRed[1], accentColorRed[2]);
     doc.setLineWidth(0.05);
-    doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+    doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18);
 
     // 2. Footer Text - RED Pantone 2035 C
-    doc.setFontSize(8);
     doc.setTextColor(accentColorRed[0], accentColorRed[1], accentColorRed[2]);
-    doc.setFont(doc.getFont().fontName, 'normal');
-
+    
     // Left: UNI-ISO SGQ Citation (Only if enabled in settings, default true)
     if (adminProfile?.printIsoCitation !== false) {
-      doc.text(`Sistema Gestione Qualità UNI-ISO 9001 | ${isoRevision}`, margin, pageHeight - 10);
+      doc.setFontSize(5); 
+      doc.setFont(doc.getFont().fontName, 'normal'); // Non grassetto per ISO
+      doc.text(`Sistema Gestione Qualità UNI-ISO 9001 | ${isoRevision}`, margin, pageHeight - 13);
     }
 
-    // Right: Page X / Y (Always visible)
-    const pageText = `${i} / ${pageCount}`;
-    doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), pageHeight - 10);
+    // Right: Page X / Y (Always visible, bold per user mockups)
+    doc.setFontSize(7);
+    doc.setFont(doc.getFont().fontName, 'bold');
+    const pageText = `Pagina ${i} di ${pageCount}`; // lowercase "di"
+    doc.text(pageText, pageWidth - margin - doc.getTextWidth(pageText), pageHeight - 13);
+
+    // RESET COLORS to avoid bleeding into next elements or future pages
+    doc.setTextColor(50, 50, 50);
+    doc.setDrawColor(0, 0, 0);
   }
 };

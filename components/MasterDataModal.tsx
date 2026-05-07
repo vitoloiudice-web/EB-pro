@@ -1246,94 +1246,9 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
       return;
     }
 
-    if (type === 'CUSTOMERS') {
-        const pm = finalData.paymentMethods || {};
-        const hasPm = pm.riba?.enabled || pm.bb?.enabled || pm.rd?.enabled || pm.titoli?.enabled || pm.altro?.enabled;
-        
-        const pmc = finalData.paymentMethodsCentral || {};
-        const hasPmc = pmc.riba?.enabled || pmc.bb?.enabled || pmc.rd?.enabled || pmc.titoli?.enabled || pmc.altro?.enabled;
-
-        if (!hasPm) {
-            setError("Selezionare almeno una Condizione di Pagamento vs. Fornitori.");
-            return;
-        }
-        if (!hasPmc) {
-            setError("Selezionare almeno una Condizione di Pagamento vs. Centrale Acquisti.");
-            return;
-        }
-    }
-
     setError(null);
     onSave(finalData);
     onClose();
-  };
-
-  const AVAILABLE_TERMS = ['A VISTA', '30 GG', '60 GG', '90 GG', '120 GG', '180 GG'];
-
-  const renderPaymentMethodRow = (fieldGroup: 'paymentMethods' | 'paymentMethodsCentral', methodKey: 'riba' | 'bb' | 'rd' | 'titoli' | 'altro', label: string) => {
-      const data = formData[fieldGroup]?.[methodKey] || { enabled: false, description: '', terms: [] };
-      const isAltro = methodKey === 'altro';
-
-      return (
-          <div className="flex flex-col sm:flex-row items-start gap-3 mt-4">
-              <div className="flex items-center gap-3 pt-2 w-full sm:w-32 shrink-0">
-                  <input type="checkbox" className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" 
-                      checked={data.enabled}
-                      onChange={(e) => {
-                          const newMethods = { ...(formData[fieldGroup] || {}) };
-                          newMethods[methodKey] = { ...data, enabled: e.target.checked };
-                          handleChange(fieldGroup, newMethods);
-                      }}
-                  />
-                  <div className="font-bold text-slate-600">{label}</div>
-              </div>
-
-              <div className="flex-1 w-full space-y-2">
-                  {isAltro && (
-                      <input type="text" className="neu-input w-full px-3 py-1.5 text-sm" placeholder="Descrizione metodo di pagamento (es. Carta di Credito)..." 
-                          disabled={!data.enabled}
-                          value={data.customLabel || ''}
-                          onChange={(e) => {
-                              const newMethods = { ...(formData[fieldGroup] || {}) };
-                              newMethods[methodKey] = { ...data, customLabel: e.target.value };
-                              handleChange(fieldGroup, newMethods);
-                          }}
-                      />
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2 items-center">
-                      {AVAILABLE_TERMS.map(term => (
-                          <label key={term} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${data.enabled ? 'hover:bg-slate-50' : 'opacity-50 cursor-not-allowed'} ${data.terms?.includes(term) ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-bold shadow-sm' : 'border-slate-200 text-slate-600'}`}>
-                              <input type="checkbox" className="hidden" 
-                                  disabled={!data.enabled}
-                                  checked={data.terms?.includes(term) || false}
-                                  onChange={(e) => {
-                                      const newTerms = e.target.checked 
-                                          ? [...(data.terms || []), term]
-                                          : (data.terms || []).filter((t: string) => t !== term);
-                                      
-                                      const newMethods = { ...(formData[fieldGroup] || {}) };
-                                      newMethods[methodKey] = { ...data, terms: newTerms };
-                                      handleChange(fieldGroup, newMethods);
-                                  }}
-                              />
-                              {term}
-                          </label>
-                      ))}
-                  </div>
-
-                  <input type="text" className="neu-input w-full px-3 py-1.5 text-sm" placeholder={isAltro ? "Termini descrittivi aggiuntivi e testo libero..." : "Campi descrittivi aggiuntivi (es. DF, FM)..."} 
-                      disabled={!data.enabled}
-                      value={data.description || ''}
-                      onChange={(e) => {
-                          const newMethods = { ...(formData[fieldGroup] || {}) };
-                          newMethods[methodKey] = { ...data, description: e.target.value };
-                          handleChange(fieldGroup, newMethods);
-                      }}
-                  />
-              </div>
-          </div>
-      );
   };
 
   return (
@@ -1393,6 +1308,13 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
                     <div className="p-2 overflow-y-auto custom-scrollbar">
                         {type === 'CUSTOMERS' && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Amministratore Card */}
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl mb-2">
+                                <div className="col-span-full font-bold text-xs text-blue-800 uppercase mb-1">Amministratore Società Cliente</div>
+                                <InputGroup label="Nome e Cognome Amministratore" value={formData.legalRepresentative} onChange={(val) => handleChange('legalRepresentative', val)} />
+                                <InputGroup label="Codice Fiscale Amministratore" value={formData.taxId} onChange={(val) => handleChange('taxId', val)} />
+                            </div>
+
                             <InputGroup label="Partita IVA" value={formData.vatNumber} onChange={(val) => handleChange('vatNumber', val)} />
                             <div className="col-span-1 sm:col-span-2">
                                 <InputGroup label="Ragione Sociale" value={formData.name} onChange={(val) => handleChange('name', val)} />
@@ -1403,53 +1325,28 @@ const MasterDataModal: React.FC<MasterDataModalProps> = ({
                             <InputGroup label="Comune" value={formData.city} onChange={(val) => handleChange('city', val)} />
                             <InputGroup label="CAP" value={formData.zipCode} onChange={(val) => handleChange('zipCode', val)} />
                             <InputGroup label="Indirizzo (Via/Piazza, Civico)" value={formData.address} onChange={(val) => handleChange('address', val)} />
+                            <div className="hidden lg:block"></div>
 
-                            <InputGroup label="Email Generica" value={formData.email} onChange={(val) => handleChange('email', val)} type="email" />
-                            <InputGroup label="Email Amministrazione" value={formData.adminEmail} onChange={(val) => handleChange('adminEmail', val)} type="email" />
-                            <InputGroup label="Email Uff. Tecnico" value={formData.techEmail} onChange={(val) => handleChange('techEmail', val)} type="email" />
-                            
-                            <InputGroup label="Email Uff. Commerciale" value={formData.salesEmail} onChange={(val) => handleChange('salesEmail', val)} type="email" />
-                            <InputGroup label="Email Magazzino" value={formData.warehouseEmail} onChange={(val) => handleChange('warehouseEmail', val)} type="email" />
-                            <div className="hidden lg:block"></div> {/* Spacer */}
-
-                            <InputGroup label="Telefono Principale" value={formData.phone} onChange={(val) => handleChange('phone', val)} />
-                            <InputGroup label="Telefono Amministrazione" value={formData.adminPhone} onChange={(val) => handleChange('adminPhone', val)} />
-                            <InputGroup label="Telefono Uff. Tecnico" value={formData.techPhone} onChange={(val) => handleChange('techPhone', val)} />
-
-                            <InputGroup label="Telefono Uff. Commerciale" value={formData.salesPhone} onChange={(val) => handleChange('salesPhone', val)} />
-                            <InputGroup label="Telefono Magazzino" value={formData.warehousePhone} onChange={(val) => handleChange('warehousePhone', val)} />
-                            <div className="hidden lg:block"></div> {/* Spacer */}
-
-                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
-                                <h4 className="text-sm font-bold text-slate-700 mb-4">Condizioni Pagamento vs. Fornitori</h4>
-                                <div className="space-y-4">
-                                    {renderPaymentMethodRow('paymentMethods', 'riba', 'Ri.Ba')}
-                                    {renderPaymentMethodRow('paymentMethods', 'bb', 'Bonifico (BB)')}
-                                    {renderPaymentMethodRow('paymentMethods', 'rd', 'Rim. Diretta')}
-                                    {renderPaymentMethodRow('paymentMethods', 'titoli', 'Titoli (Ass.)')}
-                                    {renderPaymentMethodRow('paymentMethods', 'altro', 'Altro')}
-                                </div>
+                            {/* Email Subcard */}
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                <div className="col-span-full font-bold text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sezione Email</div>
+                                <InputGroup label="Email Generica" value={formData.email} onChange={(val) => handleChange('email', val)} type="email" />
+                                <InputGroup label="Email Amministrazione" value={formData.adminEmail} onChange={(val) => handleChange('adminEmail', val)} type="email" />
+                                <InputGroup label="Email Uff. Tecnico" value={formData.techEmail} onChange={(val) => handleChange('techEmail', val)} type="email" />
+                                <InputGroup label="Email Uff. Commerciale" value={formData.salesEmail} onChange={(val) => handleChange('salesEmail', val)} type="email" />
+                                <InputGroup label="Email Magazzino" value={formData.warehouseEmail} onChange={(val) => handleChange('warehouseEmail', val)} type="email" />
                             </div>
 
-                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
-                                <h4 className="text-sm font-bold text-slate-700 mb-4">Contratto di Servizio (Centrale Acquisti)</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <InputGroup label="Fee Mensile (€)" value={formData.monthlyFee} onChange={(val) => handleChange('monthlyFee', val)} type="number" />
-                                    <InputGroup label="Data Inizio Contratto" value={formData.contractStartDate} onChange={(val) => handleChange('contractStartDate', val)} type="date" />
-                                    <InputGroup label="Data Fine Contratto" value={formData.contractEndDate} onChange={(val) => handleChange('contractEndDate', val)} type="date" />
-                                </div>
+                            {/* Telefono Subcard */}
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                <div className="col-span-full font-bold text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sezione Telefono</div>
+                                <InputGroup label="Telefono Principale" value={formData.phone} onChange={(val) => handleChange('phone', val)} />
+                                <InputGroup label="Telefono Amministrazione" value={formData.adminPhone} onChange={(val) => handleChange('adminPhone', val)} />
+                                <InputGroup label="Telefono Uff. Tecnico" value={formData.techPhone} onChange={(val) => handleChange('techPhone', val)} />
+                                <InputGroup label="Telefono Uff. Commerciale" value={formData.salesPhone} onChange={(val) => handleChange('salesPhone', val)} />
+                                <InputGroup label="Telefono Magazzino" value={formData.warehousePhone} onChange={(val) => handleChange('warehousePhone', val)} />
                             </div>
-                            
-                            <div className="col-span-1 sm:col-span-2 lg:col-span-3 mt-4 border-t border-slate-200 pt-4">
-                                <h4 className="text-sm font-bold text-slate-700 mb-4">Condizioni Pagamento vs. Centrale Acquisti</h4>
-                                <div className="space-y-4">
-                                    {renderPaymentMethodRow('paymentMethodsCentral', 'riba', 'Ri.Ba')}
-                                    {renderPaymentMethodRow('paymentMethodsCentral', 'bb', 'Bonifico (BB)')}
-                                    {renderPaymentMethodRow('paymentMethodsCentral', 'rd', 'Rim. Diretta')}
-                                    {renderPaymentMethodRow('paymentMethodsCentral', 'titoli', 'Titoli (Ass.)')}
-                                    {renderPaymentMethodRow('paymentMethodsCentral', 'altro', 'Altro')}
-                                </div>
-                            </div>
+
                         </div>
                         )}
 

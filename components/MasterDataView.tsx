@@ -6,12 +6,13 @@ import Pagination from './common/Pagination';
 import { usePaginatedData } from '../hooks/usePaginatedData';
 import MasterDataModal from './MasterDataModal';
 import CodingSchemaModal from './CodingSchemaModal';
+import ServiceContractModal from './ServiceContractModal';
 import { CodingSchema } from '../types';
 import Tooltip from './common/Tooltip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
+import { applyMinimalHeader, applyDocumentMetadata, applyStandardHeader, applyStandardSignature, applyPageFooter, PDF_CONFIG } from '../services/pdfService';
 import { getNextDocumentNumber, persistGeneratedDocument } from '../services/documentService';
 import { geminiService } from '../services/geminiService';
 
@@ -37,6 +38,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
   // State for Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -86,6 +88,11 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     setIsModalOpen(true);
   };
 
+  const handleOpenContractModal = (cust: Customer) => {
+    setEditingEntity(cust);
+    setIsContractModalOpen(true);
+  };
+
   const handleSave = async (formData: any) => {
     try {
         const isNew = !editingEntity;
@@ -125,7 +132,19 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         } else if (activeMainTab === 'SUPPLIERS') {
             await dataService.saveSupplier(client, { ...formData, id: editingEntity?.id }, isNew);
         } else if (activeMainTab === 'CUSTOMERS') {
-            await dataService.saveCustomer(client, { ...formData, id: editingEntity?.id }, isNew);
+            const customerToSave = { ...formData, id: editingEntity?.id };
+            
+            // Assign contract number if new
+            if (isNew && !customerToSave.contractNumber) {
+                try {
+                    const nextNum = await getNextDocumentNumber('CONTRATTO');
+                    customerToSave.contractNumber = `CTR-${nextNum}`;
+                } catch (err) {
+                    console.error("Error generating initial contract number:", err);
+                }
+            }
+            
+            await dataService.saveCustomer(client, customerToSave, isNew);
         }
 
         setIsModalOpen(false);
@@ -404,11 +423,11 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     const pm = cust.paymentMethods;
     if (!pm) return '-';
     let parts: string[] = [];
-    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''}`.trim());
-    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''}`.trim());
-    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''}`.trim());
-    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''}`.trim());
-    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''}`.trim());
+    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''} ${pm.riba.description || ''}`.trim());
+    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''} ${pm.bb.description || ''}`.trim());
+    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''} ${pm.rd.description || ''}`.trim());
+    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''} ${pm.titoli.description || ''}`.trim());
+    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''} ${pm.altro.description || ''}`.trim());
     
     return parts.join(' | ').trim() || '-';
   };
@@ -417,167 +436,402 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     const pm = cust.paymentMethodsCentral;
     if (!pm) return '-';
     let parts: string[] = [];
-    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''}`.trim());
-    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''}`.trim());
-    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''}`.trim());
-    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''}`.trim());
-    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''}`.trim());
+    if (pm.riba?.enabled) parts.push(`Ri.Ba. ${pm.riba.terms?.join(', ') || ''} ${pm.riba.description || ''}`.trim());
+    if (pm.bb?.enabled) parts.push(`BB ${pm.bb.terms?.join(', ') || ''} ${pm.bb.description || ''}`.trim());
+    if (pm.rd?.enabled) parts.push(`RD ${pm.rd.terms?.join(', ') || ''} ${pm.rd.description || ''}`.trim());
+    if (pm.titoli?.enabled) parts.push(`Titoli ${pm.titoli.terms?.join(', ') || ''} ${pm.titoli.description || ''}`.trim());
+    if (pm.altro?.enabled) parts.push(`Altro (${pm.altro.customLabel || ''}) ${pm.altro.terms?.join(', ') || ''} ${pm.altro.description || ''}`.trim());
     
     return parts.join(' | ').trim() || '-';
+  };
+
+  const handleSaveContract = async (updates: Partial<Customer>) => {
+    if (!editingEntity) return;
+    try {
+      await dataService.saveCustomer(client, { ...editingEntity, ...updates }, false);
+      setSuccess("Parametri contrattuali aggiornati correttamente.");
+      setTimeout(() => setSuccess(null), 3000);
+      refresh();
+    } catch (err: any) {
+      setError(`Errore aggiornamento contratto: ${err.message}`);
+    }
   };
 
   const handleExportContractPDF = async (cust: Customer) => {
     const doc = new jsPDF();
     const { margin, primaryColor, secondaryColor } = PDF_CONFIG;
     const pageWidth = doc.internal.pageSize.getWidth();
-
-    let docNum = `CTR-PENDING`;
-    try {
-      const nextNum = await getNextDocumentNumber('REPORT_ANALYTICS');
-      docNum = `CTR-${nextNum}`;
-    } catch (err) {
-      console.error("Error generating contract doc number:", err);
-    }
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Custom Header for Contract
-    // 1. Logo EB-Pro (Left)
-    const logoY = 15;
-    const logoAreaWidth = 40;
+    // ENTERPRISE FONT SCALE
+    const FONT_FAMILY = 'helvetica';
+    const TITLE_SIZE = 18;
+    const SUBJECT_SIZE = 12;
+    const SECTION_SIZE = 11;
+    const BODY_SIZE = 9.5;
+    const DETAIL_SIZE = 9;
+    const LABEL_SIZE = 8;
+
+    const docNum = cust.contractNumber || 'CTR-PENDING';
+    const docTitle = "CONVENZIONE SERVIZIO DI CENTRALE ACQUISTI";
+    const recipientName = cust.name;
+
+    const reapplyMinimalHeader = () => {
+      return applyMinimalHeader(doc, adminProfile);
+    };
+
+    // 1. Header & Metadata (First Page Full)
+    const lineY = reapplyMinimalHeader();
+    const startY = applyDocumentMetadata(doc, docTitle, recipientName, docNum, lineY);
+    // 2. Intro Parties - REDESIGNED per mockup
+    doc.setFontSize(BODY_SIZE);
+    doc.setFont(FONT_FAMILY, 'normal');
+    const partiesHeaderY = startY + 5;
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text("TRA LE SOTTOSCRITTE PARTI:", pageWidth / 2, partiesHeaderY, { align: 'center' });
     
-    if (adminProfile?.logoUrl) {
-        try {
-            doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, logoAreaWidth, 20);
-        } catch (e) {
-            doc.setFontSize(14);
-            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-            doc.text("EB-PRO", margin, logoY + 12);
-        }
-    } else {
-        doc.setFontSize(14);
-        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text("EB-PRO", margin, logoY + 12);
-    }
+    let currentY = partiesHeaderY + 8;
 
-    // 2. Company Details (Next to Logo)
-    doc.setFontSize(8);
-    doc.setTextColor(50, 50, 50);
-    doc.setFont(doc.getFont().fontName, 'bold');
-    const detailsX = margin + logoAreaWidth + 5;
-    doc.text(adminProfile?.companyName || "EB-Pro Centrale Acquisti", detailsX, logoY + 5);
-    
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.setTextColor(secondaryColor[0]);
-    doc.text([
-        `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
-        `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
-        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
-        `Regime Fiscale: Ordinario / Split Payment`
-    ], detailsX, logoY + 10);
+    // FORNITORE SECTION
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text("EASYBUY", margin, currentY);
+    currentY += 4;
+    doc.setFont(FONT_FAMILY, 'normal');
+    const supplierText = `con sede legale in ${adminProfile?.address || '...'}, ${adminProfile?.zipCode || ''} ${adminProfile?.city || ''} (BA), P.IVA: ${adminProfile?.vatNumber || '...'}, in persona del legale rappresentante pro tempore, Sig. Vito Loiudice (di seguito denominata "Fornitore" o "Centrale Acquisti") c.f. ${adminProfile?.taxId || '...'}.`;
+    const splitSupplier = doc.splitTextToSize(supplierText, pageWidth - (margin * 2));
+    doc.text(splitSupplier, margin, currentY, { align: 'justify', maxWidth: pageWidth - (margin * 2) });
+    currentY += splitSupplier.length * 4 + 4;
 
-    // 3. Document Title
-    const titleY = logoY + 35;
-    doc.setFontSize(22);
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    const titleText = "CONTRATTO DI SERVIZIO";
-    doc.text(titleText, pageWidth - margin - doc.getTextWidth(titleText), titleY);
-    
-    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setLineWidth(0.1);
-    doc.line(pageWidth - margin - doc.getTextWidth(titleText), titleY + 2, pageWidth - margin, titleY + 2);
-
-    // 4. Info Block
-    const infoY = titleY + 15;
-    doc.setFontSize(10);
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.setTextColor(secondaryColor[0]);
-    doc.text(`Documento N.: ${docNum}`, pageWidth - margin - doc.getTextWidth(`Documento N.: ${docNum}`), infoY);
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, pageWidth - margin - doc.getTextWidth(`Data: ${new Date().toLocaleDateString('it-IT')}`), infoY + 6);
-    doc.text(`Destinatario: ${cust.name}`, pageWidth - margin - doc.getTextWidth(`Destinatario: ${cust.name}`), infoY + 12);
-
-    const startY = infoY + 30;
-    doc.setFontSize(14);
-    doc.setTextColor(50, 50, 50);
-    doc.text("Oggetto: Fornitura Servizi di Centrale Acquisti", margin, startY);
-
-    doc.setFontSize(10);
-    let currentY = startY + 15;
-
-    // Body text
-    const introText = `Il presente contratto regola la fornitura dei servizi tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il cliente ${cust.name}.`;
-    doc.text(introText, margin, currentY);
-    currentY += 10;
-
-    // Customer Details
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("Dettagli Cliente:", margin, currentY);
-    doc.setFont(doc.getFont().fontName, 'normal');
+    // "E" separator
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text("E", pageWidth / 2, currentY, { align: 'center' });
     currentY += 6;
-    doc.text(`- P.IVA: ${cust.vatNumber}`, margin + 5, currentY);
-    currentY += 5;
-    doc.text(`- Indirizzo: ${cust.address}`, margin + 5, currentY);
-    currentY += 5;
-    doc.text(`- Pagamento vs Centrale Acquisti: ${formatCentralPayments(cust)}`, margin + 5, currentY);
-    currentY += 10;
 
-    // Validity
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("Validità e Quote:", margin, currentY);
-    doc.setFont(doc.getFont().fontName, 'normal');
-    currentY += 6;
-    doc.text(`- Dal: ${cust.contractStartDate || 'N.D.'}`, margin + 5, currentY);
-    currentY += 5;
-    doc.text(`- Al: ${cust.contractEndDate || 'N.D.'}`, margin + 5, currentY);
-    currentY += 5;
-    doc.text(`- Canone Mensile: € ${cust.monthlyFee?.toLocaleString('it-IT') || '0,00'} (esclusa IVA)`, margin + 5, currentY);
-    currentY += 10;
+    // CLIENTE SECTION
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text(`${cust.name.toUpperCase()}`, margin, currentY);
+    currentY += 4;
+    doc.setFont(FONT_FAMILY, 'normal');
+    const fullAddress = [cust.address, cust.zipCode, cust.city, cust.province ? `(${cust.province})` : ''].filter(Boolean).join(' ');
+    const clientText = `con sede legale in ${fullAddress || '...'}, P.IVA: ${cust.vatNumber || '...'}, in persona del suo legale rappresentante pro tempore, Sig. ${cust.legalRepresentative || '...'} (di seguito denominata "Cliente") c.f. ${cust.taxId || '...'}.`;
+    const splitClient = doc.splitTextToSize(clientText, pageWidth - (margin * 2));
+    doc.text(splitClient, margin, currentY, { align: 'justify', maxWidth: pageWidth - (margin * 2) });
+    currentY += splitClient.length * 4 + 4;
 
-    // General Terms
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("Termini Generali:", margin, currentY);
-    doc.setFont(doc.getFont().fontName, 'normal');
     currentY += 6;
-    
-    const terms = [
-        "L'accesso alla piattaforma EB-Pro è esclusivo diritto della centrale acquisti.",
-        "Per tutta la durata del contratto il cliente paga la fee mensile per:",
-        "a. affidare la completa gestione dei suoi acquisti alla centrale acquisti EB-Pro in regime di esclusiva.",
-        "b. ottenere grazie alla centrale acquisti EB-Pro vantaggi di saving, di ottimizzazione della spesa.",
-        "c. ottenere grazie alla centrale acquisti EB-Pro vantaggi di ottimizzazione delle scorte.",
-        "d. ottenere grazie alla centrale acquisti EB-Pro vantaggi di miglioramento quali-quantitativo dei beni/prodotti/servizi acquistati/da acquistare.",
-        "e. ricevere dalla centrale acquisti EB-Pro report periodici (a seconda di quanto concordato) sugli aspetti legati ai vantaggi."
+
+    // 3. ARTICLES - EXACT TEXT FROM contratto_testo.txt
+    const finalFee = cust.monthlyFee !== undefined ? cust.monthlyFee : (cust.standardMonthlyFee || 0);
+    const hasMonthlyFee = finalFee > 0;
+    const formattedFee = finalFee.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const centralPayStr = formatCentralPayments(cust);
+    const supplierPayStr = formatCustomerPayments(cust);
+    const formattedExpenseBudget = (cust.expenseBudget || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const articles = [
+      {
+        title: "ART. 1 – OGGETTO DELLA CONVENZIONE, PIATTAFORMA, SERVIZIO, OBIETTIVI E OBBLIGHI",
+        paragraphs: [
+          "1.1. Il presente contratto ha per oggetto la fornitura del \"Servizio di Centrale Acquisti\" erogato dal Fornitore a favore del Cliente.",
+          "1.2. L’utilizzo di metodi, strumenti, mezzi, tecnologie e competenze (d'ora in avanti identificati come \"piattaforma\") proprietarie EASYBUY è interamente ed esclusivamente gestito (accesso, utilizzo, manutenzione) dal Fornitore che ne detiene i diritti in via esclusiva.",
+          "1.3 Il Servizio è finalizzato al perseguimento dei seguenti obiettivi strategici e operativi:",
+          "  * Gestione completa degli acquisti: affidamento integrale ed esclusivo dei processi di approvvigionamento alla Centrale Acquisti.",
+          "  * Vantaggi di saving: ottenimento ove possibile di risparmi economici diretti ed efficientamento dei costi di acquisto.",
+          "  * Ottimizzazione della spesa e delle scorte: razionalizzazione ove possibile dei flussi finanziari e logistici legati all'approvvigionamento e allo stoccaggio.",
+          "  * Miglioramento Quali-Quantitativo: innalzamento ove possibile degli standard qualitativi dei beni e servizi e ottimizzazione dei volumi di fornitura.",
+          "  * Reportistica Periodica: fornitura di analisi sistematiche sui KPI (indicatori) di performance e sui vantaggi competitivi conseguiti.",
+          "1.4. Il Fornitore si impegna per la durata della convenzione a:",
+          "  * Gestire gli acquisti per conto del Cliente attraverso l’utilizzo della piattaforma proprietaria EASYBUY.",
+          "  * Ottenere da fornitori terzi l'approvvigionamento dei beni necessari a realizzare gli obiettivi di programmazione acquisti e il fabbisogno tecnico del Cliente.",
+          "  * Intervenire tempestivamente nei confronti dei fornitori terzi per evitare ove possibile o risolvere eventuali problemi/criticità nelle forniture, con esclusione di criticità logistiche (trasporti) e/o altre problematiche derivanti e/o legate a eventi non prevedibili e non direttamente imputabili o riconducibili al Fornitore o alla Centrale Acquisti.",
+          "1.5. Il Cilente si impegna per la durata della convenzione a:",
+          "  * Pagare gli acquisti effettuati per suo conto dalla Centrale Acquisti alle scadenze e con i modi definiti nel presente accordo.",
+          "  * Fornire con congruo anticipo alla Centrale Acquisti la programmazione dei propri acquisti e il fabbisogno tecnico.",
+          "  * Fornire alla Centrale Acquisti idoneo elenco di fornitori terzi (abituali/storici/preferenziali/graditi/secondari/sgraditi) e/o qualificati per la programmazione degli acquisti e del fabbisogno tecnico.",
+          "  * Nominare il RU (Referente Unico) per la fase di esecuzione e coordinamento con la Centrale Acquisti.",
+          "  * Garantire verso i fornitori terzi la puntuale copertura economica e finanziaria degli acquisti effettuati dalla Centrale Acquisti, nei modi e alle scadenze definite dalla Centrale Acquisti.",
+          "  * Garantire verso il Fornitore la puntuale copertura economica e finanziaria di tutto quanto previsto al successivo art. 4."
+        ]
+      },
+      {
+        title: "ART. 2 – DURATA, RINNOVO E RECESSO",
+        paragraphs: [
+          `2.1. Il presente contratto ha validità temporale dal: ${cust.contractStartDate || '...'} al: ${cust.contractEndDate || '...'}.`,
+          "2.2. Salvo disdetta o recesso potrà essere tacitamente rinnovato per la stessa durata senza necessità di formali comunicazioni.",
+          "2.3. Ciascuna delle parti potrà recedere dal presente contratto mediante comunicazione scritta da inviarsi tramite PEC o raccomandata A/R con un preavviso obbligatorio non inferiore a 60 (sessanta) giorni. In caso di recesso, il Cliente resta obbligato al saldo di tutte le prestazioni già rese e delle fee maturate fino alla data di effettiva cessazione del rapporto."
+        ]
+      },
+      {
+        title: "ART. 3 – REGIME DI ESCLUSIVA E PENALE PER VIOLAZIONE",
+        paragraphs: [
+          "3.1. Per tutta la durata del presente accordo, il Cliente si impegna ad affidare in via esclusiva la gestione dei propri acquisti alla Centrale Acquisti.",
+          "3.2. È fatto espresso divieto al Cliente di concludere accordi di acquisto per beni o servizi rientranti nel perimetro del presente contratto o ulteriori accordi di servizio finalizzati all'ottenimento degli obiettivi di cui all'art. 1, senza l'intermediazione del Fornitore.",
+          "3.3. In caso di violazione del predetto obbligo di esclusiva, il Cliente sarà tenuto a corrispondere ad EASYBUY, a titolo di penale ex art. 1382 c.c., una somma pari al 20% del valore di ogni acquisto effettuato in violazione, fatto salvo il diritto del Fornitore al risarcimento del maggior danno e alla risoluzione del contratto per inadempimento."
+        ]
+      },
+      {
+        title: "ART. 4 – CORRISPETTIVI E SPESE, MODALITÀ E TERMINI DI PAGAMENTO, MODIFICHE",
+        paragraphs: [
+          "4.1. Per i servizi prestati, le parti concordano le seguenti condizioni economiche:",
+          "  CORRISPETTIVI (FEE), MODALITÀ E TERMINI",
+          `    * Importi: € ${formattedFee}`,
+          `    * Da corrispondere: [[${hasMonthlyFee ? 'X' : ' '}]] mensilmente`,
+          `      [[${!hasMonthlyFee ? 'X' : ' '}]] in Unica Soluzione per il periodo di riferimento.`,
+          `    * Modalità e Termini: ${centralPayStr}`,
+          "  SPESE PER L'ESECUZIONE DEL SERVIZIO, MODALITÀ E TERMINI",
+          `    * Importi: nel limite di € ${formattedExpenseBudget} / ${cust.expenseFrequency || 'mese'}`,
+          `    * Da corrispondere: [[${cust.expensePreventivo ? 'X' : ' '}]] a preventivo ${cust.expensePreventivoText ? cust.expensePreventivoText : ''}`,
+          `      [[${cust.expenseConsuntivo ? 'X' : ' '}]] a consuntivo ${cust.expenseConsuntivoText ? cust.expenseConsuntivoText : ''}`,
+          `    * Modalità e Termini: ${centralPayStr}`,
+          "4.2. Salvo possibili conguagli, revisioni o modifiche (tempestivamente comunicati al Cliente), corrispettivi e spese ivi pattuiti saranno fatturati dal Fornitore con i modi, nei termini e per gli importi qui sopra definiti e saranno pagati dal Cliente previa ricezione di apposite fatture emesse dal Fornitore."
+        ]
+      },
+      {
+        title: "ART. 5 – METRICHE TECNICHE DI SAVING (KPI)",
+        paragraphs: [
+          "L'efficacia della gestione sarà monitorata sulla base dei seguenti \"indicatori\" Key Performance Indicators (KPI) concordati con il Cliente:",
+          "[TABLE]|Parametro di Misurazione|Descrizione|Frequenza\nDelta Prezzo (Saving)|Differenza tra Prezzo Target (storico/mercato) e Prezzo d'Acquisto EASYBUY|Monitoraggio trimestrale\nEfficienza Scorte|Riduzione dell'indice di invenduto e ottimizzazione rotazione stock|Monitoraggio semestrale\nQualità Fornitura|Rapporto tra conformità tecnica dei beni e ordini eseguiti|Monitoraggio periodico concordato"
+        ]
+      },
+      {
+        title: "ART. 6 – PENALI",
+        paragraphs: [
+          "6.1. Il Fornitore garantisce la diligenza professionale nel perseguimento dei livelli di saving concordati.",
+          `6.2. Qualora il saving accertato in sede di monitoraggio trimestrale risulti inferiore al ${cust.savingTarget || '[...]'}% rispetto ai parametri target, per cause direttamente ed esclusivamente imputabili a negligenza del Fornitore, quest'ultimo applicherà una riduzione proporzionale del ${cust.penaltyReduction || '[...]'}% sulla Fee professionale dovuta per il periodo di fatturazione successivo, a titolo di indennizzo per il mancato raggiungimento degli obiettivi minimi di efficienza.`
+        ]
+      },
+      {
+        title: "ART. 7 – CLAUSOLA NDA E SEGRETO INDUSTRIALE",
+        paragraphs: [
+          "7.1. Il Cliente riconosce che la piattaforma, le strategie negoziali, i listini riservati e le analisi di mercato costituiscono segreto industriale (Artt. 98-99 D.Lgs. 30/2005) di proprietà di EASYBUY.",
+          "7.2. Il Cliente si impegna a non divulgare tali informazioni e a utilizzarle esclusivamente per l'esecuzione del presente contratto. La violazione di tale obbligo comporterà la risoluzione di diritto del contratto e l'obbligo di risarcimento del danno emergente e del lucro cessante."
+        ]
+      },
+      {
+        title: "ART. 8 – PRIVACY E RESPONSABILE DEL TRATTAMENTO (GDPR)",
+        paragraphs: [
+          "Ai sensi del Regolamento UE 2016/679, il Cliente, in qualità di Titolare, nomina espressamente EASYBUY quale Responsabile del Trattamento dei dati necessari all'esecuzione del servizio. Il Responsabile opererà conformemente alle istruzioni impartite dal Titolare e alle normative vigenti in materia di sicurezza dei dati."
+        ]
+      },
+      {
+        title: "ART. 9 – FORO COMPETENTE",
+        paragraphs: [
+          "Per ogni controversia relativa alla validità, interpretazione, esecuzione o risoluzione del presente contratto, le parti stabiliscono la competenza esclusiva ed inderogabile del Foro di Bari (BA)."
+        ]
+      }
     ];
 
-    terms.forEach(line => {
-        const splitLine = doc.splitTextToSize(line, doc.internal.pageSize.width - (margin * 2) - 10);
-        doc.text(splitLine, margin + 5, currentY);
-        currentY += (splitLine.length * 5);
+    articles.forEach(art => {
+      // 1. ESTIMATE ARTICLE HEIGHT (including Table if any)
+      let estHeight = 8; 
+      art.paragraphs.forEach(p => {
+        const trimmed = p.trim();
+        if (trimmed.startsWith('[TABLE]')) {
+          const rows = trimmed.split('\n').length;
+          estHeight += (rows * 8) + 15;
+        } else {
+          const isBullet = trimmed.startsWith('*');
+          // Match the indent used during text split:
+          const contentWidth = pageWidth - (margin * 2) - (isBullet ? 5 : 0);
+          const textToSplit = trimmed.replace(/^[\s*]+/, ''); // remove bullet for length
+          const lines = doc.splitTextToSize(textToSplit, contentWidth).length;
+          const gap = isBullet ? 1 : 1.5;
+          estHeight += (lines * 4) + gap;
+        }
+      });
+      estHeight += 1.5;
+
+      const pageBottomLimit = pageHeight - 15;
+      const remainingSpace = pageBottomLimit - currentY;
+      
+      const isArt1 = art.title.includes("ART. 1");
+      const isArt2 = art.title.includes("ART. 2");
+      const isArt3 = art.title.includes("ART. 3");
+      const isArt4 = art.title.includes("ART. 4");
+      const isArt5 = art.title.includes("ART. 5");
+
+      // FORCED MILESTONE FOR ART 5 OR STANDARD OVERFLOW
+      if (isArt5) {
+          doc.addPage();
+          currentY = reapplyMinimalHeader() + 10;
+      } else if (!isArt1 && !isArt2 && !isArt3 && !isArt4 && ((estHeight > remainingSpace && estHeight < (pageHeight - 60)) || remainingSpace < 20)) {
+          doc.addPage();
+          currentY = reapplyMinimalHeader() + 10;
+      }
+
+      doc.setFont(FONT_FAMILY, 'bold');
+      doc.setFontSize(SECTION_SIZE);
+      doc.text(art.title, margin, currentY);
+      currentY += 7;
+
+      doc.setFont(FONT_FAMILY, 'normal');
+      doc.setFontSize(BODY_SIZE);
+      art.paragraphs.forEach((p) => {
+        const trimmed = p.trim();
+        
+        // MANUAL FORCED PAGE BREAK FOR PARAGRAPH 1.5
+        if (art.title.includes("ART. 1") && trimmed.startsWith("1.5.")) {
+            doc.addPage();
+            currentY = reapplyMinimalHeader() + 10;
+            doc.setFont(FONT_FAMILY, 'normal');
+            doc.setFontSize(BODY_SIZE);
+        }
+
+        const leadingSpaces = p.match(/^\s*/)?.[0].length || 0;
+
+        if (trimmed.startsWith('[TABLE]')) {
+           const rows = trimmed.split('\n');
+           const headers = [rows[0].replace('[TABLE]', '').split('|').filter(s => s.trim() !== '')];
+           const data = rows.slice(1).map(row => row.split('|'));
+
+           autoTable(doc, {
+              startY: currentY,
+              head: headers,
+              body: data,
+              theme: 'grid',
+              styles: { fontSize: 8, cellPadding: 3 },
+              headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+              margin: { top: 40, bottom: 25, left: margin, right: margin },
+              didDrawPage: () => {
+                reapplyMinimalHeader();
+              }
+           });
+           currentY = (doc as any).lastAutoTable.finalY + 8;
+           return;
+        }
+        
+        const isNumbered = /^\d+\.\d+\.?/.test(trimmed);
+        const isBulletStar = trimmed.startsWith('*');
+        const isBulletDash = trimmed.startsWith('-');
+        const isBullet = isBulletStar || isBulletDash;
+        const hasCheckbox = trimmed.includes('[[X]]') || trimmed.includes('[[ ]]');
+        
+        let textX = margin;
+        let contentWidth = pageWidth - (margin * 2);
+
+        if (isNumbered) {
+          textX = margin + 10;
+          contentWidth -= 10;
+        } else if (isBullet) {
+          textX = margin + 18;
+          contentWidth -= 18;
+        } else if (leadingSpaces > 2 || (hasCheckbox && !isBullet)) {
+          textX = margin + 18;
+          contentWidth -= 18;
+        }
+        
+        if (hasCheckbox) contentWidth -= 35;
+
+        let textToSplit = isBullet ? trimmed.substring(1).trim() : trimmed;
+        let lineLabel = "";
+        
+        if (hasCheckbox) {
+          textToSplit = textToSplit.replace('[[X]]', '').replace('[[ ]]', '').trim();
+          if (textToSplit.startsWith("Scadenze:")) {
+            lineLabel = "Scadenze: ";
+            textToSplit = textToSplit.replace("Scadenze:", "").trim();
+          } else if (textToSplit.startsWith("Da corrispondere:")) {
+            lineLabel = "Da corrispondere: ";
+            textToSplit = textToSplit.replace("Da corrispondere:", "").trim();
+          }
+        }
+
+        const splitP = doc.splitTextToSize(textToSplit, contentWidth);
+        const paragraphHeight = (splitP.length * 4);
+        const limitCurrentY = art.title.includes("ART. 4") ? pageHeight - 5 : pageBottomLimit;
+        if (currentY + paragraphHeight > limitCurrentY) {
+          doc.addPage();
+          currentY = reapplyMinimalHeader() + 10;
+          doc.setFont(FONT_FAMILY, 'normal');
+          doc.setFontSize(BODY_SIZE);
+        }
+
+        if (isBullet) {
+          doc.setFont(FONT_FAMILY, 'bold');
+          doc.text(isBulletStar ? "•" : "–", margin + 14, currentY);
+          doc.setFont(FONT_FAMILY, 'normal');
+        }
+
+        if (hasCheckbox) {
+          const isChecked = trimmed.includes('[[X]]');
+          const boxSize = 3;
+          const fixedBoxX = margin + 50;
+          if (lineLabel) doc.text(lineLabel, textX, currentY);
+          const boxY = currentY - 2.5;
+          doc.setDrawColor(150);
+          doc.rect(fixedBoxX, boxY, boxSize, boxSize);
+          if (isChecked) {
+            doc.line(fixedBoxX, boxY, fixedBoxX + boxSize, boxY + boxSize);
+            doc.line(fixedBoxX + boxSize, boxY, fixedBoxX, boxY + boxSize);
+          }
+          doc.text(splitP, fixedBoxX + 5, currentY);
+        } else {
+          doc.text(splitP, textX, currentY, { align: 'justify', maxWidth: contentWidth });
+        }
+        const gap = isBullet ? 1 : 1.5;
+        currentY += (splitP.length * 4) + gap;
+      });
+      currentY += 1.5; 
     });
 
-    // Signature Area
-    const signatureY = 240;
+    // 4. SOTTOSCRIZIONE
+    let signatureY = currentY + 6;
+    if (signatureY > pageHeight - 15) {
+      doc.addPage();
+      signatureY = reapplyMinimalHeader() + 10;
+    }
+
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.setFontSize(SECTION_SIZE);
+    doc.text("SOTTOSCRIZIONE", pageWidth / 2, signatureY, { align: 'center' });
+    signatureY += 7;
     
-    // Left: EB-Pro
-    doc.setFontSize(10);
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("EB-Pro Centrale Acquisti", margin, signatureY);
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.text("L'Amministratore Unico", margin, signatureY + 5);
+    doc.setFont(FONT_FAMILY, 'normal');
+    doc.setFontSize(BODY_SIZE);
+    doc.text(`Luogo e data: ${adminProfile?.city || 'Bari'}, ${new Date().toLocaleDateString('it-IT')}`, margin, signatureY);
+    signatureY += 15;
+
+    const colWidthSize = (pageWidth - (margin * 2)) / 2;
+    
+    // EASYBUY (Left)
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text("EASYBUY", margin, signatureY);
+    doc.setFont(FONT_FAMILY, 'normal');
+    doc.text("L'Amministratore", margin, signatureY + 5);
     doc.text("Vito Loiudice", margin, signatureY + 10);
     doc.line(margin, signatureY + 25, margin + 60, signatureY + 25);
 
-    // Right: Customer
-    const rightX = pageWidth - margin - 60;
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("Timbro e Firma Cliente", rightX, signatureY);
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.text(cust.name, rightX, signatureY + 5);
-    doc.text("L'Amministratore", rightX, signatureY + 10);
-    doc.line(rightX, signatureY + 25, pageWidth - margin, signatureY + 25);
+    // CLIENTE (Right)
+    const signRightX = margin + colWidthSize + 5;
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text("(Timbro e Firma)", signRightX, signatureY);
+    doc.text(`${cust.name}`, signRightX, signatureY + 5);
+    doc.setFont(FONT_FAMILY, 'normal');
+    doc.text("L'Amministratore", signRightX, signatureY + 10);
+    doc.line(signRightX, signatureY + 25, signRightX + 60, signatureY + 25);
 
-    applyPageFooter(doc, "MOD-CTR-01 REV. 01", adminProfile);
+    // 5. APPROVAZIONE VESSATORIE
+    doc.addPage();
+    currentY = reapplyMinimalHeader() + 10;
 
-    // PERSISTENCE & BACKUP
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.setFontSize(DETAIL_SIZE);
+    doc.text("APPROVAZIONE SPECIFICA DELLE CLAUSOLE VESSATORIE", pageWidth / 2, currentY, { align: 'center' });
+    currentY += 8;
+
+    doc.setFont(FONT_FAMILY, 'normal');
+    doc.setFontSize(BODY_SIZE - 0.5);
+    const vexText = `Ai sensi e per gli effetti degli artt. 1341 e 1342 del Codice Civile, il Cliente dichiara di aver letto attentamente e di approvare specificamente i seguenti articoli: Art. 2.2 (Rinnovo e recesso); Art. 3 (Regime di esclusiva e penale del 20%); Art. 6 (Penali per mancato saving); Art. 7 (Segreto industriale e risoluzione); Art. 9 (Foro competente esclusivo di Bari).`;
+    const splitVexLines = doc.splitTextToSize(vexText, pageWidth - (margin * 2));
+    doc.text(splitVexLines, margin, currentY);
+    currentY += (splitVexLines.length * 4) + 10;
+
+    doc.setFont(FONT_FAMILY, 'bold');
+    doc.text(`${cust.name} (L'Amministratore)`, signRightX, currentY);
+    doc.line(signRightX, currentY + 10, signRightX + 60, currentY + 10);
+
+    applyPageFooter(doc, "MOD-CTR-01 REV. 02", adminProfile);
+
     try {
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       await persistGeneratedDocument({
@@ -608,63 +862,18 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
       console.error("Error generating supplier contract doc number:", err);
     }
     
-    // Custom Header for Contract
-    // 1. Logo EB-Pro (Left)
-    const logoY = 15;
-    const logoAreaWidth = 40;
-    
-    if (adminProfile?.logoUrl) {
-        try {
-            doc.addImage(adminProfile.logoUrl, 'PNG', margin, logoY, logoAreaWidth, 20);
-        } catch (e) {
-            doc.setFontSize(14);
-            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-            doc.text("EB-PRO", margin, logoY + 12);
-        }
-    } else {
-        doc.setFontSize(14);
-        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text("EB-PRO", margin, logoY + 12);
-    }
+    const docNumStr = `SUP-${docNum.split('-').pop()}`; // Keep generated number
+    const docTitle = "ACCORDO DI FORNITURA";
+    const recipientName = sup.name;
 
-    // 2. Company Details (Next to Logo)
-    doc.setFontSize(8);
-    doc.setTextColor(50, 50, 50);
-    doc.setFont(doc.getFont().fontName, 'bold');
-    const detailsX = margin + logoAreaWidth + 5;
-    doc.text(adminProfile?.companyName || "EB-Pro Centrale Acquisti", detailsX, logoY + 5);
-    
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.setTextColor(secondaryColor[0]);
-    doc.text([
-        `P.IVA: ${adminProfile?.vatNumber || "N.D."} - C.F.: ${adminProfile?.taxId || "N.D."}`,
-        `${adminProfile?.address || ""}, ${adminProfile?.zipCode || ""} ${adminProfile?.city || ""} (${adminProfile?.province || ""})`,
-        `Email: ${adminProfile?.email || ""} - Website: ${adminProfile?.website || ""}`,
-        `Regime Fiscale: Ordinario / Split Payment`
-    ], detailsX, logoY + 10);
+    const reapplyMinimalHeader = () => {
+      return applyMinimalHeader(doc, adminProfile);
+    };
 
-    // 3. Document Title
-    const titleY = logoY + 35;
-    doc.setFontSize(22);
-    doc.setFont(doc.getFont().fontName, 'bold');
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    const titleText = "ACCORDO DI FORNITURA";
-    doc.text(titleText, pageWidth - margin - doc.getTextWidth(titleText), titleY);
-    
-    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setLineWidth(0.1);
-    doc.line(pageWidth - margin - doc.getTextWidth(titleText), titleY + 2, pageWidth - margin, titleY + 2);
+    // 1. Header & Metadata (First Page Full)
+    const lineY = reapplyMinimalHeader();
+    const startY = applyDocumentMetadata(doc, docTitle, recipientName, docNumStr, lineY);
 
-    // 4. Info Block
-    const infoY = titleY + 15;
-    doc.setFontSize(10);
-    doc.setFont(doc.getFont().fontName, 'normal');
-    doc.setTextColor(secondaryColor[0]);
-    doc.text(`Documento N.: ${docNum}`, pageWidth - margin - doc.getTextWidth(`Documento N.: ${docNum}`), infoY);
-    doc.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, pageWidth - margin - doc.getTextWidth(`Data: ${new Date().toLocaleDateString('it-IT')}`), infoY + 6);
-    doc.text(`Fornitore: ${sup.name}`, pageWidth - margin - doc.getTextWidth(`Fornitore: ${sup.name}`), infoY + 12);
-
-    const startY = infoY + 30;
     doc.setFontSize(14);
     doc.setTextColor(50, 50, 50);
     doc.text("Oggetto: Partnership per la Fornitura Centralizzata", margin, startY);
@@ -676,7 +885,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     const introText = `Il presente accordo costituisce l'oggetto della collaborazione tra ${adminProfile?.companyName || 'Centrale Acquisti'} ed il fornitore ${sup.name} al fine di raggiungere obiettivi di reciproco vantaggio.`;
     const splitIntro = doc.splitTextToSize(introText, pageWidth - (margin * 2));
     doc.text(splitIntro, margin, currentY);
-    currentY += (splitIntro.length * 6);
+    currentY += (splitIntro.length * 4);
 
     // Supplier Details
     doc.setFont(doc.getFont().fontName, 'bold');
@@ -710,7 +919,7 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         doc.setLineWidth(0.05);
         doc.text("•", margin + 2, currentY);
         doc.text(splitLine, margin + 5, currentY);
-        currentY += (splitLine.length * 5) + 2;
+        currentY += (splitLine.length * 4) + 2;
     });
 
     // Signature Area
@@ -719,9 +928,9 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
     // Left: EB-Pro
     doc.setFontSize(10);
     doc.setFont(doc.getFont().fontName, 'bold');
-    doc.text("EB-Pro Centrale Acquisti", margin, signatureY);
+    doc.text("EasyBuy", margin, signatureY);
     doc.setFont(doc.getFont().fontName, 'normal');
-    doc.text("L'Amministratore Unico", margin, signatureY + 5);
+    doc.text("L'amministratore", margin, signatureY + 5);
     doc.text("Vito Loiudice", margin, signatureY + 10);
     doc.line(margin, signatureY + 25, margin + 60, signatureY + 25);
 
@@ -977,16 +1186,23 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
                     <td className="p-4 text-center">
                       <div className="flex justify-center gap-1">
                         <button 
-                            onClick={() => handleExportContractPDF(cust)}
+                            onClick={() => handleOpenContractModal(cust)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Contratto"
+                            title="Gestione Contratti"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </button>
+                        <button 
+                            onClick={() => handleExportContractPDF(cust)}
+                            className="p-1.5 text-slate-600 hover:bg-slate-50 rounded transition-colors"
+                            title="Esporta PDF Contratto"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </button>
                         <button 
                             onClick={() => handleEdit(cust)}
-                            className="p-1.5 text-slate-600 hover:bg-slate-50 rounded transition-colors"
-                            title="Modifica"
+                            className="p-1.5 text-slate-400 hover:bg-slate-50 rounded transition-colors"
+                            title="Modifica Anagrafica"
                         >
                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         </button>
@@ -1048,6 +1264,13 @@ const MasterDataView: React.FC<MasterDataViewProps> = ({ client, initialTab, ini
         onSave={handleSave}
         onDelete={handleDelete}
         client={client}
+      />
+
+    <ServiceContractModal 
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+        customer={editingEntity}
+        onSave={handleSaveContract}
       />
 
       <div className="flex justify-end space-x-3">

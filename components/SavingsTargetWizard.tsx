@@ -37,7 +37,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
   const loadData = async () => {
     setLoading(true);
     try {
-      const itemsRes = await dataService.getItems(client, 1, 1000);
+      const itemsRes = await dataService.getItems(client, 1, 1000, '');
       setItems(itemsRes.data);
     } catch (error) {
       console.error("Error loading items:", error);
@@ -46,7 +46,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
   };
 
   const categories = useMemo(() => {
-    const cats = new Set(items.map(i => typeof i.category === 'string' ? i.category : i.category.toString()));
+    const cats = new Set(items.map(i => i.category));
     return ['Tutte le categorie', ...Array.from(cats)];
   }, [items]);
 
@@ -57,7 +57,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
     // Filtra items
     const filteredItems = category === 'Tutte le categorie' 
       ? items 
-      : items.filter(i => (typeof i.category === 'string' ? i.category : i.category.toString()) === category);
+      : items.filter(i => i.category === category);
 
     for (const item of filteredItems) {
       if (!item.suppliers || item.suppliers.length < 2) continue; // Requires at least 2 suppliers
@@ -102,7 +102,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
   const baselineBudget = useMemo(() => {
     const filteredItems = category === 'Tutte le categorie' 
       ? items 
-      : items.filter(i => (typeof i.category === 'string' ? i.category : i.category.toString()) === category);
+      : items.filter(i => i.category === category);
     return filteredItems.reduce((acc, item) => acc + (item.cost * (item.stock > 0 ? item.stock * 12 : 1200)), 0);
   }, [items, category]);
 
@@ -140,7 +140,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
             const savingAction: any = {
                 itemSku: updatedItem.sku,
                 itemName: updatedItem.name,
-                categoryName: typeof updatedItem.category === 'string' ? updatedItem.category : updatedItem.category.toString(),
+                categoryName: updatedItem.category,
                 type: 'SUPPLIER_SWITCH',
                 status: 'CERTIFIED',
                 baselinePrice: action.currentPrice,
@@ -173,7 +173,7 @@ const SavingsTargetWizard: React.FC<SavingsTargetWizardProps> = ({ client, onClo
             const savingAction: any = {
                 itemSku: action.item.sku,
                 itemName: action.item.name,
-                categoryName: typeof action.item.category === 'string' ? action.item.category : action.item.category.toString(),
+                categoryName: action.item.category,
                 type: 'RENEGOTIATION',
                 status: 'IN_PROGRESS',
                 baselinePrice: action.currentPrice,
